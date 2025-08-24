@@ -1,0 +1,67 @@
+<div id="table-wrap" class="card">
+  <div class="card-body">
+    <div class="d-flex justify-content-between align-items-center mb-2">
+      <div class="fw-semibold">Категории ({{ ym }})</div>
+      <div class="text-secondary small">
+        План: <b>{{ "%.0f"|format(summary.total_plan) }}</b> ₽ ·
+        Факт: <b>{{ "%.0f"|format(summary.total_minus) }}</b> ₽ ·
+        Остаток: <b>{{ "%.0f"|format(summary.total_left) }}</b> ₽
+      </div>
+    </div>
+
+    <div class="table-responsive">
+      <table class="table table-sm align-middle">
+        <thead class="table-dark">
+          <tr>
+            <th>Категория</th>
+            <th>₽ фикс</th>
+            <th>%</th>
+            <th>План</th>
+            <th>Потрачено</th>
+            <th>Остаток</th>
+            <th style="width:3ch;"></th>
+          </tr>
+        </thead>
+        <tbody>
+        {% for r in rows %}
+          <tr>
+            <td>
+              {{ r.name }}
+              {% if r.name == 'Ипотека' and (r.fixed_rub or 0) < 40000 %}⚠{% endif %}
+            </td>
+            <td>
+              <form method="post" hx-post="/category/update-clean" hx-target="#table-wrap" hx-swap="outerHTML">
+                <input type="hidden" name="id" value="{{ r.id }}">
+                <input type="hidden" name="m" value="{{ ym }}">
+                <input class="form-control form-control-sm text-end" type="number" name="fixed" value="{{ r.fixed_rub or '' }}">
+                <input type="hidden" name="percent" value="{{ r.percent or '' }}">
+              </form>
+            </td>
+            <td>
+              <form method="post" hx-post="/category/update-clean" hx-target="#table-wrap" hx-swap="outerHTML">
+                <input type="hidden" name="id" value="{{ r.id }}">
+                <input type="hidden" name="m" value="{{ ym }}">
+                <input class="form-control form-control-sm text-end" type="number" name="percent" value="{{ r.percent or '' }}">
+                <input type="hidden" name="fixed" value="{{ r.fixed_rub or '' }}">
+              </form>
+            </td>
+            <td class="num">{{ "%.0f"|format(r.plan) }} ₽</td>
+            <td class="num {% if r.spent>r.plan %}text-danger{% endif %}">{{ "%.0f"|format(r.spent) }} ₽</td>
+            <td class="num {% if r.left>0 %}text-success{% endif %}">{{ "%.0f"|format(r.left) }} ₽</td>
+            <td>
+              <form method="post" hx-post="/category/delete-clean" hx-target="#table-wrap" hx-swap="outerHTML">
+                <input type="hidden" name="id" value="{{ r.id }}">
+                <input type="hidden" name="m" value="{{ ym }}">
+                <button class="btn btn-sm btn-outline-danger">×</button>
+              </form>
+            </td>
+          </tr>
+        {% endfor %}
+        {% if not rows %}
+          <tr><td colspan="7" class="text-center text-secondary py-3">Категорий пока нет</td></tr>
+        {% endif %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
