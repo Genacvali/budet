@@ -1,73 +1,15 @@
 {% extends "base.html" %}
 {% block content %}
-<div class="d-flex flex-wrap align-items-end gap-2 mb-3">
-  <div>
-    <label class="form-label mb-1">Месяц</label>
-    <div class="d-flex gap-2">
-      <input class="form-control" style="max-width:200px" type="month" id="month" value="{{ ym }}">
-      <button class="btn btn-primary" onclick="loadState()">Показать</button>
-      <a class="btn btn-outline-secondary" href="/">К карточному UI</a>
-    </div>
-    <div id="prev" class="text-secondary small mt-1"></div>
-  </div>
+<div class="d-flex align-items-end gap-2 mb-3">
+  <input id="m" class="form-control" style="max-width:200px" type="month" value="{{ ym }}">
+  <button class="btn btn-primary" onclick="loadGrid()">Показать</button>
+  <button class="btn btn-success ms-auto" onclick="addIncomeGrid()">+ Доход</button>
+  <button class="btn btn-outline-primary" onclick="addCategoryGrid()">+ Категория</button>
 </div>
 
-<div class="row g-2">
-  <div class="col-12 col-lg-8">
-    <div class="card">
-      <div class="card-body">
-        <div class="d-flex justify-content-between align-items-center mb-2">
-          <div class="fw-semibold">Бюджет (как Excel)</div>
-          <div class="d-flex gap-2">
-            <button class="btn btn-sm btn-outline-success" onclick="addRow()">+ Категория</button>
-            <button class="btn btn-sm btn-outline-secondary" onclick="toggleCompact()">Компактно</button>
-          </div>
-        </div>
-        <div id="budget-table"></div>
-        <div id="totals" class="mt-2 text-secondary small"></div>
-      </div>
-    </div>
-  </div>
+<div id="grid"></div>
+<div class="mt-2 text-secondary" id="totals"></div>
 
-  <div class="col-12 col-lg-4">
-    <div class="card">
-      <div class="card-body">
-        <div class="fw-semibold mb-2">Доходы</div>
-        <div class="row g-2">
-          <div class="col-5"><input id="inc-date" class="form-control" type="date" value="{{ ym }}-05"></div>
-          <div class="col-7">
-            <select id="inc-source" class="form-select">
-              <option>ЗП</option><option>Аванс</option><option>Декретные</option>
-            </select>
-          </div>
-          <div class="col-8"><input id="inc-amount" class="form-control" type="number" step="0.01" placeholder="₽"></div>
-          <div class="col-4"><button class="btn btn-primary w-100" onclick="addIncome()">Добавить</button></div>
-        </div>
-        <div id="bases" class="text-secondary small mt-2"></div>
-      </div>
-    </div>
-
-    <div class="card mt-2">
-      <div class="card-body">
-        <div class="fw-semibold mb-2">Быстрый минус</div>
-        <div class="row g-2">
-          <div class="col-7">
-            <select id="minus-cat" class="form-select"></select>
-          </div>
-          <div class="col-5">
-            <div class="input-group">
-              <input id="minus-amount" class="form-control" type="number" step="0.01" placeholder="₽">
-              <button class="btn btn-danger" onclick="quickMinus()">−</button>
-            </div>
-          </div>
-        </div>
-        <div class="text-secondary small mt-2">Совет: выдели строку и нажми <kbd>M</kbd> — появится минус для этой категории.</div>
-      </div>
-    </div>
-  </div>
-</div>
-
-<!-- Tabulator (легковесная «эксель-таблица») -->
 <link href="https://cdn.jsdelivr.net/npm/tabulator-tables@5.6.2/dist/css/tabulator.min.css" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/tabulator-tables@5.6.2/dist/js/tabulator.min.js"></script>
 <script src="{{ url_for('static', filename='grid.js') }}"></script>

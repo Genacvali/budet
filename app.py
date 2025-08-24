@@ -120,12 +120,22 @@ def partial_table_min():
 @app.post("/category/update-min")
 def category_update_min():
     cid = int(request.form["id"])
-    percent = request.form.get("percent"); fixed = request.form.get("fixed")
-    percent = None if percent in (None, "",) else percent
-    fixed   = None if fixed   in (None, "",) else fixed
+    percent = request.form.get("percent")
+    fixed   = request.form.get("fixed")
+    source  = request.form.get("source")  # NEW
+
+    percent = None if percent in (None, "") else percent
+    fixed   = None if fixed   in (None, "") else fixed
+
     con = db(); cur = con.cursor()
-    cur.execute("UPDATE categories SET percent=?, fixed_rub=? WHERE id=?", (percent, fixed, cid))
+    if source in SOURCES:
+        cur.execute("UPDATE categories SET percent=?, fixed_rub=?, source=? WHERE id=?",
+                    (percent, fixed, source, cid))
+    else:
+        cur.execute("UPDATE categories SET percent=?, fixed_rub=? WHERE id=?",
+                    (percent, fixed, cid))
     con.commit(); con.close()
+
     ym = request.form.get("m") or date.today().strftime("%Y-%m")
     rows, summary = month_data(ym)
     return render_template("_table_min.html", ym=ym, rows=rows, summary=summary, sources=SOURCES)
@@ -175,6 +185,59 @@ def api_minus():
     con.commit(); con.close()
     rows, summary = month_data(ym)
     return jsonify(dict(ok=True, ym=ym, rows=rows, summary=summary))
+
+# ---------- GRID ----------
+@app.get("/grid")
+def grid_ui():
+    ym = request.args.get("m") or date.today().strftime("%Y-%m")
+    return render_template("grid.html", ym=ym)
+
+@app.post("/api/category/add")
+def api_category_add():
+    name = (request.json.get("name") or "").strip()
+    source = request.json.get("source") or "ЗП"
+    if not name or source not in SOURCES:
+        return jsonify({"error":"bad input"}), 400
+    con = db(); cur = con.cursor()
+    cur.execute("INSERT OR IGNORE INTO categories(name,source) VALUES(?,?)",(name, source))
+    con.commit(); con.close()
+    return jsonify({"ok": True})
+
+@app.post("/api/category/update")
+def api_category_update():
+    cid     = int(request.json["id"])
+    percent = request.json.get("percent")
+    fixed   = request.json.get("fixed_rub")
+    source  = request.json.get("source")
+    con = db(); cur = con.cursor()
+    cur.execute("""UPDATE categories SET
+                      percent=?,
+                      fixed_rub=?,
+                      source=COALESCE(?, source)
+                   WHERE id=?""",
+                (percent if percent!="" else None,
+                 fixed   if fixed!=""   else None,
+                 source if source in SOURCES else None,
+                 cid))
+    con.commit(); con.close()
+    return jsonify({"ok": True})
+
+@app.post("/api/category/delete")
+def api_category_delete():
+    cid = int(request.json["id"])
+    con = db(); cur = con.cursor()
+    cur.execute("DELETE FROM expenses WHERE category_id=?", (cid,))
+    cur.execute("DELETE FROM categories WHERE id=?", (cid,))
+    con.commit(); con.close()
+    return jsonify({"ok": True})
+
+@app.post("/api/income/add")
+def api_income_add():
+    dt = request.json["dt"]; source = request.json["source"]; amount = float(request.json["amount"])
+    con = db(); cur = con.cursor()
+    cur.execute("INSERT INTO incomes(dt,source,amount,ym) VALUES(?,?,?,?)",(dt,source,amount,dt[:7]))
+    con.commit(); con.close()
+    return jsonify({"ok": True})
 
 if __name__ == "__main__":
     app.run(host="127.0.0.1", port=8000, debug=True)
