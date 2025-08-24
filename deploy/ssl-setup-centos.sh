@@ -33,22 +33,64 @@ fi
 
 echo -e "${YELLOW}📦 Installing Certbot via package manager...${NC}"
 
+# Detect OS version to use correct package names
+if [ -f /etc/os-release ]; then
+    . /etc/os-release
+    VERSION_ID=${VERSION_ID}
+fi
+
 # Install certbot using package manager instead of snap
 if command -v yum >/dev/null 2>&1; then
     # CentOS/RHEL 7
     yum install -y epel-release
-    yum install -y certbot python2-certbot-nginx
+    if [[ "$VERSION_ID" =~ ^7 ]]; then
+        yum install -y certbot python2-certbot-nginx
+    else
+        # CentOS 8+ or recent RHEL with yum
+        yum install -y certbot python3-certbot-nginx
+    fi
 elif command -v dnf >/dev/null 2>&1; then
-    # CentOS/RHEL 8+
+    # CentOS/RHEL 8+ or Fedora
     dnf install -y epel-release
-    dnf install -y certbot python3-certbot-nginx
+    
+    # Try different package name variants for different versions
+    if dnf list python3-certbot-nginx >/dev/null 2>&1; then
+        dnf install -y certbot python3-certbot-nginx
+    elif dnf list certbot-nginx >/dev/null 2>&1; then
+        dnf install -y certbot certbot-nginx  
+    else
+        echo -e "${YELLOW}⚠️  Standard nginx plugin not found, installing certbot only...${NC}"
+        dnf install -y certbot
+        echo -e "${YELLOW}📝 You'll need to configure nginx manually after getting certificate${NC}"
+    fi
 else
     echo -e "${RED}❌ Unsupported system for this script. Use ssl-setup.sh instead.${NC}"
     exit 1
 fi
 
 echo -e "${YELLOW}🔒 Obtaining SSL certificate...${NC}"
-certbot --nginx -d "$DOMAIN" --email "$EMAIL" --agree-tos --non-interactive
+
+# First try with nginx plugin
+if certbot --nginx -d "$DOMAIN" --email "$EMAIL" --agree-tos --non-interactive 2>/dev/null; then
+    echo -e "${GREEN}✅ Certificate obtained with nginx plugin${NC}"
+else
+    echo -e "${YELLOW}⚠️  Nginx plugin failed, trying webroot method...${NC}"
+    
+    # Stop nginx temporarily for webroot
+    systemctl stop nginx
+    
+    # Get certificate using standalone method
+    if certbot certonly --standalone -d "$DOMAIN" --email "$EMAIL" --agree-tos --non-interactive; then
+        echo -e "${GREEN}✅ Certificate obtained with standalone method${NC}"
+        
+        # Start nginx back
+        systemctl start nginx
+    else
+        echo -e "${RED}❌ Failed to obtain certificate${NC}"
+        systemctl start nginx
+        exit 1
+    fi
+fi
 
 # Update nginx config for your domain
 cat > /etc/nginx/sites-available/budget << EOF
