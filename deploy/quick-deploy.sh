@@ -63,7 +63,9 @@ systemctl daemon-reload
 systemctl enable budget.service
 
 echo -e "${YELLOW}5️⃣ Setting up Nginx...${NC}"
-cat > /etc/nginx/sites-available/budget << 'EOF'
+
+# CentOS uses /etc/nginx/conf.d/ instead of sites-available
+cat > /etc/nginx/conf.d/budget.conf << EOF
 server {
     listen 80;
     server_name _;
@@ -75,25 +77,17 @@ server {
 
     location / {
         proxy_pass http://127.0.0.1:8000;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
         proxy_http_version 1.1;
         proxy_set_header Connection "";
     }
 }
 EOF
 
-# Create sites-enabled if not exists (for CentOS)
-mkdir -p /etc/nginx/sites-enabled
-
-# Add include to nginx.conf if not present
-if ! grep -q "sites-enabled" /etc/nginx/nginx.conf; then
-    sed -i '/http {/a\    include /etc/nginx/sites-enabled/*;' /etc/nginx/nginx.conf
-fi
-
-ln -sf /etc/nginx/sites-available/budget /etc/nginx/sites-enabled/
-rm -f /etc/nginx/sites-enabled/default
+# Remove default nginx config if exists
+rm -f /etc/nginx/conf.d/default.conf
 
 echo -e "${YELLOW}6️⃣ Setting up environment...${NC}"
 if [ ! -f "$APP_PATH/.env" ]; then
@@ -103,13 +97,21 @@ fi
 # Fix ownership
 chown -R $USER:$USER "$APP_PATH"
 
-echo -e "${YELLOW}7️⃣ Starting services...${NC}"
+echo -e "${YELLOW}7️⃣ Opening firewall...${NC}"
+# CentOS uses firewalld by default
+if command -v firewall-cmd >/dev/null 2>&1; then
+    firewall-cmd --add-service=http --permanent 2>/dev/null || true
+    firewall-cmd --reload 2>/dev/null || true
+    echo "✅ Firewall configured for HTTP"
+fi
+
+echo -e "${YELLOW}8️⃣ Starting services...${NC}"
 nginx -t
 systemctl start budget.service
 systemctl start nginx
 systemctl enable nginx
 
-echo -e "${YELLOW}8️⃣ Checking status...${NC}"
+echo -e "${YELLOW}9️⃣ Checking status...${NC}"
 sleep 2
 
 if systemctl is-active --quiet budget.service; then
@@ -125,7 +127,7 @@ else
     echo -e "${RED}❌ Nginx: failed${NC}"
 fi
 
-echo -e "${YELLOW}9️⃣ Testing application...${NC}"
+echo -e "${YELLOW}🔟 Testing application...${NC}"
 PUBLIC_IP=$(curl -s ifconfig.me 2>/dev/null || echo "YOUR_SERVER_IP")
 
 if curl -s http://127.0.0.1:8000 >/dev/null; then
