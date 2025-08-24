@@ -21,8 +21,25 @@ if [ "$EUID" -ne 0 ]; then
 fi
 
 echo -e "${YELLOW}📋 Installing system dependencies...${NC}"
-apt update
-apt install -y nginx python3-venv python3-pip
+
+# Detect package manager and install dependencies
+if command -v apt >/dev/null 2>&1; then
+    # Debian/Ubuntu
+    apt update
+    apt install -y nginx python3-venv python3-pip curl
+elif command -v yum >/dev/null 2>&1; then
+    # CentOS/RHEL 7
+    yum install -y epel-release
+    yum install -y nginx python3 python3-pip curl
+    # Enable python3-venv module
+    python3 -m pip install --user virtualenv
+elif command -v dnf >/dev/null 2>&1; then
+    # Fedora/CentOS 8+
+    dnf install -y nginx python3 python3-pip python3-venv curl
+else
+    echo -e "${RED}❌ Unsupported package manager. Please install nginx, python3, and python3-venv manually.${NC}"
+    exit 1
+fi
 
 echo -e "${YELLOW}📁 Setting up directories...${NC}"
 mkdir -p "$LOG_DIR"
@@ -31,7 +48,14 @@ mkdir -p "$APP_DIR"
 echo -e "${YELLOW}🐍 Setting up Python environment...${NC}"
 cd "$APP_DIR"
 if [ ! -d ".venv" ]; then
-    python3 -m venv .venv
+    if command -v python3 -m venv >/dev/null 2>&1; then
+        python3 -m venv .venv
+    elif command -v virtualenv >/dev/null 2>&1; then
+        virtualenv -p python3 .venv
+    else
+        echo -e "${RED}❌ Could not create virtual environment. Please install python3-venv.${NC}"
+        exit 1
+    fi
 fi
 
 source .venv/bin/activate

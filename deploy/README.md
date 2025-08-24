@@ -1,10 +1,19 @@
 # Production Deployment Guide
 
-Complete production setup for Budget App on DigitalOcean or any Ubuntu/Debian VPS.
+Complete production setup for Budget App on any Linux VPS (DigitalOcean, Linode, AWS, etc.).
+
+## 🎯 Supported Operating Systems
+
+- **Ubuntu**: 18.04, 20.04, 22.04+
+- **Debian**: 10, 11, 12+ 
+- **CentOS**: 7, 8+
+- **RHEL**: 7, 8, 9+
+- **Fedora**: 35+
+- **Amazon Linux**: 2
 
 ## 📋 Prerequisites
 
-- Ubuntu 20.04+ or Debian 11+ VPS
+- Linux VPS: Ubuntu 20.04+, Debian 11+, CentOS 7+, RHEL 7+, or Fedora
 - Root access or sudo privileges  
 - Domain name pointed to server (optional, for HTTPS)
 - Firewall allowing HTTP (80) and HTTPS (443) traffic
@@ -31,8 +40,15 @@ cd /root/budget-app
 
 If you have a domain name:
 
+**Ubuntu/Debian (with snap):**
 ```bash
 ./deploy/ssl-setup.sh
+# Enter your domain and email when prompted
+```
+
+**CentOS/RHEL (without snap):**
+```bash
+./deploy/ssl-setup-centos.sh
 # Enter your domain and email when prompted
 ```
 

@@ -1,10 +1,10 @@
 #!/bin/bash
 set -e
 
-# SSL Setup with Let's Encrypt for Budget App
-# Run after deploy.sh and when you have a domain pointed to your server
+# SSL Setup with Let's Encrypt for CentOS/RHEL (without snap)
+# Alternative to ssl-setup.sh for systems where snap is not available
 
-echo "🔒 Setting up HTTPS with Let's Encrypt..."
+echo "🔒 Setting up HTTPS with Let's Encrypt (CentOS/RHEL)..."
 
 # Colors
 RED='\033[0;31m'
@@ -14,7 +14,7 @@ NC='\033[0m'
 
 # Check if running as root
 if [ "$EUID" -ne 0 ]; then
-    echo -e "${RED}❌ Please run as root (sudo ./ssl-setup.sh)${NC}"
+    echo -e "${RED}❌ Please run as root (sudo ./ssl-setup-centos.sh)${NC}"
     exit 1
 fi
 
@@ -31,43 +31,20 @@ if [ -z "$EMAIL" ]; then
     exit 1
 fi
 
-echo -e "${YELLOW}📦 Installing Certbot...${NC}"
+echo -e "${YELLOW}📦 Installing Certbot via package manager...${NC}"
 
-# Detect package manager and install snapd
-if command -v apt >/dev/null 2>&1; then
-    # Debian/Ubuntu
-    apt update
-    apt install -y snapd
-elif command -v yum >/dev/null 2>&1; then
+# Install certbot using package manager instead of snap
+if command -v yum >/dev/null 2>&1; then
     # CentOS/RHEL 7
     yum install -y epel-release
-    yum install -y snapd
-    systemctl enable --now snapd.socket
-    ln -sf /var/lib/snapd/snap /snap
+    yum install -y certbot python2-certbot-nginx
 elif command -v dnf >/dev/null 2>&1; then
-    # Fedora/CentOS 8+
-    dnf install -y snapd
-    systemctl enable --now snapd.socket
-    ln -sf /var/lib/snapd/snap /snap
+    # CentOS/RHEL 8+
+    dnf install -y epel-release
+    dnf install -y certbot python3-certbot-nginx
 else
-    echo -e "${RED}❌ Unsupported package manager. Please install snapd manually.${NC}"
+    echo -e "${RED}❌ Unsupported system for this script. Use ssl-setup.sh instead.${NC}"
     exit 1
-fi
-
-# Wait for snapd to be ready
-sleep 10
-
-# Install certbot via snap
-snap install core; snap refresh core
-snap install --classic certbot
-
-# Create symlink
-if [ -f /snap/bin/certbot ]; then
-    ln -sf /snap/bin/certbot /usr/bin/certbot
-elif [ -f /var/lib/snapd/snap/bin/certbot ]; then
-    ln -sf /var/lib/snapd/snap/bin/certbot /usr/bin/certbot
-else
-    echo -e "${YELLOW}⚠️  Certbot installed but symlink creation failed. You may need to use full path.${NC}"
 fi
 
 echo -e "${YELLOW}🔒 Obtaining SSL certificate...${NC}"
@@ -75,12 +52,14 @@ certbot --nginx -d "$DOMAIN" --email "$EMAIL" --agree-tos --non-interactive
 
 # Update nginx config for your domain
 cat > /etc/nginx/sites-available/budget << EOF
+# HTTP redirect to HTTPS
 server {
     listen 80;
     server_name $DOMAIN;
     return 301 https://\$server_name\$request_uri;
 }
 
+# HTTPS server
 server {
     listen 443 ssl http2;
     server_name $DOMAIN;
@@ -137,6 +116,15 @@ server {
     }
 }
 EOF
+
+# Create sites-enabled directory if it doesn't exist (CentOS doesn't have it by default)
+mkdir -p /etc/nginx/sites-enabled
+# Add include to main nginx.conf if not present
+if ! grep -q "sites-enabled" /etc/nginx/nginx.conf; then
+    sed -i '/http {/a\    include /etc/nginx/sites-enabled/*;' /etc/nginx/nginx.conf
+fi
+
+ln -sf /etc/nginx/sites-available/budget /etc/nginx/sites-enabled/budget
 
 nginx -t && systemctl reload nginx
 
