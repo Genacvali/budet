@@ -457,10 +457,73 @@ def grid_ui():
     ym = request.args.get("m") or date.today().strftime("%Y-%m")
     return render_template("grid.html", ym=ym)
 
+# --- MINI UI ROUTES (упрощённый интерфейс) ---
+
 @app.get("/simple")
 def simple_ui():
     ym = request.args.get("m") or date.today().strftime("%Y-%m")
     return render_template("simple.html", ym=ym)
+
+@app.get("/partials/table-min")
+def partial_table_min():
+    ym = request.args.get("m") or date.today().strftime("%Y-%m")
+    rows, summary = month_data(ym)
+    return render_template("_table_min.html", ym=ym, rows=rows, summary=summary, sources=SOURCES)
+
+# автосохранение из таблицы (₽/%) — сразу возвращаем обновлённый partial
+@app.post("/category/update-min")
+def category_update_min():
+    cid = int(request.form["id"])
+    percent = request.form.get("percent")
+    fixed = request.form.get("fixed")
+    con = db(); cur = con.cursor()
+    cur.execute("UPDATE categories SET percent=?, fixed_rub=? WHERE id=?",
+                (percent if percent != "" else None,
+                 fixed if fixed != "" else None, cid))
+    con.commit(); con.close()
+    ym = request.form.get("m")
+    rows, summary = month_data(ym)
+    return render_template("_table_min.html", ym=ym, rows=rows, summary=summary, sources=SOURCES)
+
+# удаление категории (и её минусов за все месяцы)
+@app.post("/category/delete-min")
+def category_delete_min():
+    ym = request.form["m"]
+    cid = int(request.form["id"])
+    con = db(); cur = con.cursor()
+    cur.execute("DELETE FROM expenses WHERE category_id=?", (cid,))
+    cur.execute("DELETE FROM categories WHERE id=?", (cid,))
+    con.commit(); con.close()
+    rows, summary = month_data(ym)
+    return render_template("_table_min.html", ym=ym, rows=rows, summary=summary, sources=SOURCES)
+
+# быстрая добавка дохода (через prompt)
+@app.post("/income/add-min")
+def income_add_min():
+    ym = request.form.get("m")
+    dt = request.form["dt"]
+    src = request.form["source"]
+    amount = float(request.form["amount"] or 0)
+    con = db(); cur = con.cursor()
+    cur.execute("INSERT INTO incomes(dt,source,amount,ym) VALUES(?,?,?,?)",(dt,src,amount,dt[:7]))
+    con.commit(); con.close()
+    rows, summary = month_data(ym)
+    return render_template("_table_min.html", ym=ym, rows=rows, summary=summary, sources=SOURCES)
+
+# добавка категории (через prompt)
+@app.post("/category/add-min")
+def category_add_min():
+    ym = request.form.get("m")
+    name = request.form["name"].strip()
+    source = request.form["source"]
+    percent = request.form.get("percent") or None
+    fixed = request.form.get("fixed") or None
+    con = db(); cur = con.cursor()
+    cur.execute("INSERT OR IGNORE INTO categories(name,source,percent,fixed_rub) VALUES(?,?,?,?)",
+                (name, source, percent, fixed))
+    con.commit(); con.close()
+    rows, summary = month_data(ym)
+    return render_template("_table_min.html", ym=ym, rows=rows, summary=summary, sources=SOURCES)
 
 if __name__ == "__main__":
     init_db()
