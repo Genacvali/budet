@@ -50,18 +50,43 @@ python app.py  # http://localhost:8000
 ```
 
 **Production Deployment**:
-```bash
-# Install dependencies on Ubuntu/Debian
-sudo apt update && sudo apt install -y python3-venv
 
-# Setup systemd service
+**Quick Deploy (Automated)**:
+```bash
+# Copy files to server
+scp -r . root@your-server:/root/budget-app/
+
+# Run deployment script
+ssh root@your-server
+cd /root/budget-app
+./deploy/deploy.sh
+```
+
+**Manual Deployment**:
+```bash
+# Install dependencies
+sudo apt update && sudo apt install -y nginx python3-venv
+
+# Setup application
+sudo cp deploy/budget.service /etc/systemd/system/
+sudo systemctl daemon-reload
 sudo systemctl enable --now budget.service
 
-# Web server (choose one)
-# Caddy (automatic HTTPS)
-sudo apt install -y caddy
-# Nginx (reverse proxy)
-sudo apt install -y nginx
+# Setup Nginx
+sudo cp deploy/nginx-budget.conf /etc/nginx/sites-available/budget
+sudo ln -sf /etc/nginx/sites-available/budget /etc/nginx/sites-enabled/
+sudo rm -f /etc/nginx/sites-enabled/default
+sudo nginx -t && sudo systemctl reload nginx
+
+# Setup monitoring
+sudo cp deploy/health-monitor.sh /root/budget-app/
+echo "*/5 * * * * /root/budget-app/deploy/health-monitor.sh" | sudo crontab -
+```
+
+**HTTPS Setup (Optional)**:
+```bash
+./deploy/ssl-setup.sh
+# Follow prompts to enter domain and email
 ```
 
 ## Key Features
@@ -131,6 +156,64 @@ sudo apt install -y nginx
 - Systemd service management
 - Daily database backup recommended: `cp budget.db backup/budget-$(date +%F).db`
 
+## Monitoring & Maintenance
+
+**Service Management**:
+```bash
+# Check service status
+sudo systemctl status budget.service
+
+# View logs
+sudo journalctl -u budget.service -f
+
+# Restart service
+sudo systemctl restart budget.service
+
+# Check health endpoint
+curl http://localhost/health
+```
+
+**Monitoring Logs**:
+```bash
+# Application logs
+tail -f /var/log/budget/access.log
+tail -f /var/log/budget/error.log
+
+# Health monitor logs  
+tail -f /var/log/budget/health-monitor.log
+
+# Nginx logs
+tail -f /var/log/nginx/access.log
+tail -f /var/log/nginx/error.log
+```
+
+**Backup & Restore**:
+```bash
+# Database backup
+cp /root/budget-app/budget.db /root/backups/budget-$(date +%F).db
+
+# Full backup via export endpoint
+curl -o backup.json http://localhost/export
+
+# Automated daily backup (add to crontab)
+echo "0 2 * * * cp /root/budget-app/budget.db /root/backups/budget-\$(date +\%F).db" | crontab -e
+```
+
+## Performance & Security
+
+**Resource Requirements**:
+- **CPU**: 1 core sufficient for moderate usage
+- **RAM**: 512MB minimum, 1GB recommended
+- **Storage**: 100MB for app + database growth
+- **Network**: Standard DigitalOcean 1GB/s sufficient
+
+**Security Features**:
+- Nginx security headers (HSTS, XSS protection, etc.)
+- SQLite WAL mode for concurrent access
+- Process isolation via systemd
+- Health monitoring with auto-restart
+- Log rotation and monitoring
+
 ## Common Development Tasks
 
 **Adding New Rules**:
@@ -146,3 +229,19 @@ sudo apt install -y nginx
 - Export via `/export` endpoint
 - Import via `/import` endpoint (replaces all data)
 - Manual SQL for schema changes
+
+**Troubleshooting**:
+```bash
+# Check if ports are listening
+sudo netstat -tlnp | grep :8000
+sudo netstat -tlnp | grep :80
+
+# Test internal communication
+curl http://127.0.0.1:8000/api/health
+
+# Check firewall (if enabled)
+sudo ufw status
+
+# Verify file permissions
+ls -la /root/budget-app/
+```

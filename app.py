@@ -329,6 +329,29 @@ def partial_table():
     rows, summary = month_data(ym)
     return render_template("_table.html", ym=ym, rows=rows, summary=summary, sources=SOURCES)
 
+@app.get("/api/health")
+def health_check():
+    """Health check endpoint for monitoring"""
+    try:
+        # Test database connection
+        con = db()
+        cur = con.cursor()
+        cur.execute("SELECT 1")
+        cur.fetchone()
+        con.close()
+        
+        return jsonify({
+            "status": "healthy",
+            "timestamp": date.today().isoformat(),
+            "database": "connected"
+        }), 200
+    except Exception as e:
+        return jsonify({
+            "status": "unhealthy", 
+            "error": str(e),
+            "timestamp": date.today().isoformat()
+        }), 500
+
 if __name__ == "__main__":
     init_db()
     app.run(host=os.getenv("HOST","0.0.0.0"), port=int(os.getenv("PORT","8000")), debug=True)
