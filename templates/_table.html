@@ -2,7 +2,8 @@
   <div class="card-body">
     <div class="d-flex justify-content-between align-items-center mb-2">
       <div class="fw-semibold">Категории ({{ ym }})</div>
-      <div class="text-secondary small">Итого план: <span class="num">{{ "%.0f"|format(summary.total_plan) }}</span> ₽ ·
+      <div class="text-secondary small">
+        План: <span class="num">{{ "%.0f"|format(summary.total_plan) }}</span> ₽ ·
         Факт: <span class="num">{{ "%.0f"|format(summary.total_minus) }}</span> ₽ ·
         Остаток: <span class="num">{{ "%.0f"|format(summary.total_left) }}</span> ₽
       </div>
@@ -19,7 +20,12 @@
         <tbody x-data>
           {% for r in rows %}
           <tr x-data="rowCalc({ base: {{ summary.base.get(r.source,0) }}, percent: {{ r.percent or 'null' }}, fixed: {{ r.fixed_rub or 'null' }} })">
-            <td class="fw-semibold">{{ r.name }}</td>
+            <td class="fw-semibold">
+              {{ r.name }}
+              {% if r.name == 'Ипотека' and (r.fixed_rub or 0) < 40000 %}
+                <span class="text-warning ms-1">⚠</span>
+              {% endif %}
+            </td>
             <td class="text-secondary">{{ r.source }}</td>
             <td style="width:8ch">
               <input class="form-control form-control-sm text-end"

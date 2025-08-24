@@ -1,2 +1,32 @@
 /* Дополнительная полировка */
 .table-sm td, .table-sm th { padding: .45rem .6rem; }
+
+/* Simple UI improvements */
+.card-kpi .card-body { 
+  padding: .9rem 1rem; 
+}
+
+.table td input.form-control-sm { 
+  min-width: 6ch; 
+}
+
+/* Better number formatting */
+.num {
+  font-variant-numeric: tabular-nums;
+  font-weight: 500;
+}
+
+/* Large actionable buttons */
+.btn-success, .btn-danger {
+  font-weight: 600;
+}
+
+/* Clean table appearance */
+.table > :not(caption) > * > * {
+  border-bottom-width: 1px;
+}
+
+/* Badge styling for bases */
+.badge.text-bg-secondary {
+  font-size: 0.75em;
+}

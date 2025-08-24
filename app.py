@@ -457,6 +457,11 @@ def grid_ui():
     ym = request.args.get("m") or date.today().strftime("%Y-%m")
     return render_template("grid.html", ym=ym)
 
+@app.get("/simple")
+def simple_ui():
+    ym = request.args.get("m") or date.today().strftime("%Y-%m")
+    return render_template("simple.html", ym=ym)
+
 if __name__ == "__main__":
     init_db()
     app.run(host=os.getenv("HOST","0.0.0.0"), port=int(os.getenv("PORT","8000")), debug=True)

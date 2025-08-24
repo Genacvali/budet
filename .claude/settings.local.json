@@ -5,7 +5,8 @@
       "Bash(git pull:*)",
       "Bash(rm:*)",
       "Bash(mkdir:*)",
-      "Bash(chmod:*)"
+      "Bash(chmod:*)",
+      "Bash(sudo systemctl restart:*)"
     ],
     "deny": [],
     "ask": []
