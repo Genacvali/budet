@@ -11,10 +11,8 @@
 }
 
 /* Better number formatting */
-.num {
-  font-variant-numeric: tabular-nums;
-  font-weight: 500;
-}
+.num { font-variant-numeric: tabular-nums; }
+.table-sm td, .table-sm th { padding: .45rem .6rem; }
 
 /* Large actionable buttons */
 .btn-success, .btn-danger {

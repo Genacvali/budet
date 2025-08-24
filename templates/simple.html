@@ -4,85 +4,48 @@
 <div class="d-flex flex-wrap align-items-end gap-2 mb-3">
   <div>
     <label class="form-label mb-1">Месяц</label>
-    <form method="get" class="d-flex gap-2">
-      <input class="form-control" style="max-width:200px" type="month" name="m" id="m" value="{{ ym }}">
-      <button class="btn btn-primary" onclick="document.location='?m='+document.getElementById('m').value;return false;">Показать</button>
-    </form>
-    <div id="prev" class="text-secondary small mt-1"></div>
+    <div class="d-flex gap-2">
+      <input id="m" class="form-control" style="max-width:200px" type="month" value="{{ ym }}">
+      <button class="btn btn-primary" onclick="reloadTable()">Показать</button>
+    </div>
   </div>
-
   <div class="ms-auto d-flex gap-2">
-    <button class="btn btn-success" data-bs-toggle="modal" data-bs-target="#incomeModal">+ Доход</button>
-    <button class="btn btn-danger"  data-bs-toggle="modal" data-bs-target="#minusModal">− Трата</button>
+    <button class="btn btn-outline-success" onclick="addIncome()">+ Доход</button>
+    <button class="btn btn-primary" onclick="addCategory()">+ Категория</button>
   </div>
 </div>
 
-<!-- Балансы источников -->
-<div id="sources" class="row g-2 mb-3"></div>
-
-<!-- Таблица -->
-<div id="table-wrap" hx-get="/partials/table?m={{ ym }}&compact=1" hx-trigger="load"></div>
-
-<div class="mt-2 d-flex justify-content-between">
-  <div class="text-secondary small">Подсказка: в столбцах «%» и «₽» можно редактировать прямо в таблице.</div>
-  <button class="btn btn-outline-primary" data-bs-toggle="modal" data-bs-target="#categoryModal">+ Категория</button>
+<div id="table-wrap"
+     hx-get="/partials/table-min?m={{ ym }}"
+     hx-trigger="load"
+     hx-swap="outerHTML">
+  <div class="text-secondary">Загрузка…</div>
 </div>
 
-<!-- Модалки -->
-<div class="modal fade" id="incomeModal" tabindex="-1">
-  <div class="modal-dialog"><div class="modal-content">
-    <div class="modal-header"><h5 class="modal-title">Добавить доход</h5><button class="btn-close" data-bs-dismiss="modal"></button></div>
-    <div class="modal-body">
-      <div class="row g-2">
-        <div class="col-6"><input id="inc-date" class="form-control" type="date" value="{{ ym }}-05"></div>
-        <div class="col-6">
-          <select id="inc-source" class="form-select"><option>ЗП</option><option>Аванс</option><option>Декретные</option></select>
-        </div>
-        <div class="col-12"><input id="inc-amount" class="form-control" type="number" step="0.01" placeholder="Сумма ₽"></div>
-      </div>
-    </div>
-    <div class="modal-footer">
-      <button class="btn btn-light" data-bs-dismiss="modal">Отмена</button>
-      <button class="btn btn-primary" onclick="simpleAddIncome()">Добавить</button>
-    </div>
-  </div></div>
-</div>
-
-<div class="modal fade" id="minusModal" tabindex="-1">
-  <div class="modal-dialog"><div class="modal-content">
-    <div class="modal-header"><h5 class="modal-title">Списать</h5><button class="btn-close" data-bs-dismiss="modal"></button></div>
-    <div class="modal-body">
-      <div class="row g-2">
-        <div class="col-8"><select id="minus-cat" class="form-select"></select></div>
-        <div class="col-4"><input id="minus-amount" class="form-control" type="number" step="0.01" placeholder="₽"></div>
-      </div>
-    </div>
-    <div class="modal-footer">
-      <button class="btn btn-light" data-bs-dismiss="modal">Отмена</button>
-      <button class="btn btn-danger" onclick="simpleMinus()">Списать</button>
-    </div>
-  </div></div>
-</div>
-
-<div class="modal fade" id="categoryModal" tabindex="-1">
-  <div class="modal-dialog"><div class="modal-content">
-    <div class="modal-header"><h5 class="modal-title">Новая категория</h5><button class="btn-close" data-bs-dismiss="modal"></button></div>
-    <div class="modal-body">
-      <div class="row g-2">
-        <div class="col-12"><input id="cat-name" class="form-control" placeholder="Название"></div>
-        <div class="col-6">
-          <select id="cat-source" class="form-select"><option>ЗП</option><option>Аванс</option><option>Декретные</option></select>
-        </div>
-        <div class="col-3"><input id="cat-percent" class="form-control" type="number" step="0.01" placeholder="%"></div>
-        <div class="col-3"><input id="cat-fixed" class="form-control" type="number" step="0.01" placeholder="₽"></div>
-      </div>
-    </div>
-    <div class="modal-footer">
-      <button class="btn btn-light" data-bs-dismiss="modal">Отмена</button>
-      <button class="btn btn-primary" onclick="simpleAddCategory()">Добавить</button>
-    </div>
-  </div></div>
-</div>
-
-<script src="{{ url_for('static', filename='simple.js') }}"></script>
+<script>
+async function reloadTable(){
+  const m = document.getElementById('m').value;
+  const el = document.getElementById('table-wrap');
+  el.setAttribute('hx-get', `/partials/table-min?m=${encodeURIComponent(m)}`);
+  el.dispatchEvent(new Event('load'));
+}
+async function addIncome(){
+  const m = document.getElementById('m').value;
+  const dt = prompt("Дата (YYYY-MM-DD):", m+"-05"); if(!dt) return;
+  const source = prompt("Источник (ЗП/Аванс/Декретные):","ЗП"); if(!source) return;
+  const amount = prompt("Сумма, ₽:",""); if(!amount) return;
+  const form = new FormData();
+  form.append("m", m); form.append("dt", dt); form.append("source", source); form.append("amount", amount);
+  await fetch("/income/add-min", { method:"POST", body: form });
+  reloadTable();
+}
+async function addCategory(){
+  const m = document.getElementById('m').value;
+  const name = prompt("Название категории:",""); if(!name) return;
+  const form = new FormData();
+  form.append("m", m); form.append("name", name);
+  await fetch("/category/add-min", { method:"POST", body: form });
+  reloadTable();
+}
+</script>
 {% endblock %}
