@@ -1,0 +1,466 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Бюджет — конверты</title>
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#111111">
+  <style>
+    * { box-sizing: border-box; }
+    :root { --bg:#f6f7f9; --fg:#111; --card:#fff; --muted:#666; --line:#e6e6e6; --acc:#111; }
+    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; margin: 0; background: var(--bg); color: var(--fg); }
+    header { position: sticky; top: 0; background: var(--card); padding: 12px 16px; border-bottom: 1px solid #e2e2e2; display: grid; grid-template-columns: 1fr auto; gap: 12px; z-index: 10; }
+    h1 { font-size: 18px; margin: 0; }
+    .hstack { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+    main { max-width: 1120px; margin: 0 auto; padding: 16px; }
+    .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 14px; box-shadow: 0 1px 2px rgba(0,0,0,.04); }
+    .row { display: grid; grid-template-columns: 1.1fr 0.7fr 0.8fr 1fr 0.9fr 0.9fr auto; gap: 8px; align-items: center; padding: 6px 0; }
+    .row.header { font-weight: 600; color: #333; padding-top: 0; }
+    .row.section { background: #f0f3f0; font-weight: 700; border-radius: 8px; padding: 8px; grid-template-columns: 1fr; }
+    .row input[type="text"], .row input[type="number"] { width: 100%; padding: 8px 10px; border: 1px solid #d7d7d7; border-radius: 8px; background: #fff; }
+    .row input[type="number"] { text-align: right; }
+    .muted { color: var(--muted); font-size: 13px; }
+    .pill { display: inline-flex; align-items: center; gap: 6px; background: #f4f4f5; border: 1px solid #e6e6e7; border-radius: 999px; padding: 6px 10px; }
+    .warn { background: #fff2f2; border-color: #f5b7b7 !important; }
+    .ok { background: #f1f9f2; border-color: #bfe5c2 !important; }
+    .btn { padding: 9px 12px; border: 1px solid #d0d0d0; background: #fff; border-radius: 10px; cursor: pointer; }
+    .btn.primary { background: var(--acc); color: #fff; border-color: var(--acc); }
+    .btn.danger { border-color: #f05959; color: #f05959; }
+    .btn.ghost { background: #f7f7f8; }
+    .btn:active { transform: translateY(1px); }
+    .actions { display: flex; gap: 8px; flex-wrap: wrap; }
+    .qbtns { display: inline-flex; gap: 6px; flex-wrap: wrap; }
+    .totals { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 10px; }
+    .total-box { background: #fafafa; border: 1px dashed #d7d7d7; border-radius: 10px; padding: 10px; }
+    small { color: #666; }
+    @media (max-width: 980px) {
+      .row { grid-template-columns: 1.2fr 0.7fr 0.9fr 1fr 0.9fr auto; }
+      .col-hide { display:none; }
+    }
+    /* Modal */
+    .modal { position: fixed; inset: 0; display: none; background: rgba(0,0,0,.25); align-items: center; justify-content: center; padding: 16px; }
+    .modal.show { display: flex; }
+    .sheet { width: min(760px, 96vw); max-height: 90vh; overflow: auto; background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 16px; }
+    .topbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 8px; }
+    .tx-row { display: grid; grid-template-columns: 120px 1fr 120px 36px; gap: 8px; align-items: center; padding: 6px 0; border-bottom: 1px dashed #eee; }
+    .tx-row input[type="date"] { width: 100%; padding: 8px 10px; border: 1px solid #d7d7d7; border-radius: 8px; background: #fff; }
+    .tx-row input[type="number"], .tx-row input[type="text"] { width: 100%; padding: 8px 10px; border: 1px solid #d7d7d7; border-radius: 8px; background: #fff; }
+    .right { text-align: right; }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="hstack">
+      <h1>Бюджет</h1>
+      <div class="pill">
+        <span>Бюджет:</span>
+        <input id="budget" type="number" inputmode="decimal" step="1" min="0" value="100000" style="width:130px;text-align:right">
+        <span>₽</span>
+      </div>
+      <div class="pill"><span>Сумма ввода ₽:</span> <strong id="inputSum">0 ₽</strong></div>
+      <div class="pill"><span>База для %:</span> <strong id="base">0 ₽</strong></div>
+    </div>
+    <div class="hstack actions">
+      <div class="pill">
+        <span>Период:</span>
+        <input type="month" id="monthPicker" />
+        <button class="btn ghost" id="thisMonth">Текущий</button>
+        <button class="btn ghost" id="prevMonth">Предыдущий</button>
+        <button class="btn ghost" id="allTime">Весь период</button>
+      </div>
+      <button class="btn" id="exportCsv">Экспорт CSV</button>
+      <button class="btn" id="importCsv">Импорт CSV</button>
+      <button class="btn" id="exportJson">Экспорт JSON</button>
+      <button class="btn" id="importJson">Импорт JSON</button>
+      <button class="btn" id="reset">Сброс</button>
+      <button class="btn primary" id="addRow">Категория</button>
+    </div>
+  </header>
+
+  <main>
+    <div class="card">
+      <div class="row header">
+        <div>Категория</div>
+        <div>Ввод %</div>
+        <div>Ввод ₽</div>
+        <div class="col-hide">План ₽</div>
+        <div>Потрачено</div>
+        <div>Остаток</div>
+        <div>Быстро</div>
+        <div></div>
+      </div>
+      <div id="rows"></div>
+      <div class="totals">
+        <div class="total-box">
+          <div><strong>ИТОГО план ₽:</strong> <span id="totalPlanRub">0 ₽</span></div>
+          <small>Сумма рассчитанных планов по конвертам.</small>
+        </div>
+        <div class="total-box">
+          <div><strong>ИТОГО потрачено ₽:</strong> <span id="totalSpent">0 ₽</span></div>
+          <small>Сумма операций за выбранный период.</small>
+        </div>
+        <div class="total-box" id="leftBox">
+          <div><strong>Остаток бюджета:</strong> <span id="left">0 ₽</span></div>
+          <small>Бюджет − потрачено (фактически).</small>
+        </div>
+      </div>
+    </div>
+    <p class="muted" style="margin-top:12px">Вводите значение либо в «Ввод %» (с сотыми), либо в «Ввод ₽». Если заполнены обе, приоритет у суммы ₽. Добавляйте траты через «Операции» или быстрые кнопки. Фильтр по месяцу влияет на «Потрачено» и «Остаток».</p>
+  </main>
+
+  <!-- Modal for transactions -->
+  <div class="modal" id="txModal">
+    <div class="sheet">
+      <div class="topbar">
+        <div>
+          <div style="font-weight:700" id="txTitle">Операции</div>
+          <div class="muted" id="txSubtitle"></div>
+        </div>
+        <div class="actions">
+          <button class="btn" id="txExport">Экспорт</button>
+          <button class="btn primary" id="txAdd">Добавить операцию</button>
+          <button class="btn" id="txClose">Закрыть</button>
+        </div>
+      </div>
+      <div id="txList"></div>
+    </div>
+  </div>
+
+<script>
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('./service-worker.js').catch(()=>{});
+  });
+}
+
+const currency = new Intl.NumberFormat('ru-RU');
+const fmtRUB = v => currency.format(Math.round(v)) + ' ₽';
+const todayStr = () => {
+  const d = new Date();
+  const m = (d.getMonth()+1).toString().padStart(2,'0');
+  const day = d.getDate().toString().padStart(2,'0');
+  return d.getFullYear()+'-'+m+'-'+day;
+};
+function uuid() { return 'id-' + Math.random().toString(36).slice(2,10) + Date.now().toString(36); }
+
+const defaults = [
+  {section:'ПОТРЕБНОСТИ'},
+  {name:'Квартира', id: uuid(), pct:'', rub:43000},
+  {name:'Коммунальные услуги', id: uuid(), pct:'', rub:15000},
+  {name:'Продукты', id: uuid(), pct:15, rub:''},
+  {name:'Связь', id: uuid(), pct:3, rub:''},
+  {name:'Транспорт', id: uuid(), pct:5, rub:''},
+  {name:'Гигиена', id: uuid(), pct:3, rub:''},
+  {name:'Лекарства', id: uuid(), pct:7, rub:''},
+  {section:'ЖЕЛАНИЯ'},
+  {name:'Шопинг', id: uuid(), pct:7, rub:''},
+  {name:'Развлечения', id: uuid(), pct:5, rub:''},
+  {name:'Путешествия', id: uuid(), pct:5, rub:''},
+  {section:'ИНВЕСТИЦИИ'},
+  {name:'Инвестиции', id: uuid(), pct:5, rub:''},
+  {name:'Резервный фонд', id: uuid(), pct:5, rub:''},
+];
+
+let state = JSON.parse(localStorage.getItem('budget-state-tx-plus')||'null') || {
+  budget:100000, rows:defaults, tx:{}, quick:[-500,-1000,-2000], monthFilter:''
+};
+
+const rowsWrap = document.getElementById('rows');
+const budgetInput = document.getElementById('budget');
+const monthPicker = document.getElementById('monthPicker');
+budgetInput.value = state.budget;
+monthPicker.value = state.monthFilter || '';
+
+function monthBounds(val){
+  if(!val) return null;
+  const [y,m] = val.split('-').map(Number);
+  const from = new Date(y, m-1, 1);
+  const to = new Date(y, m, 1); // exclusive
+  return {from, to};
+}
+function inMonth(dateStr){
+  if(!monthPicker.value) return true;
+  const b = monthBounds(monthPicker.value);
+  const d = new Date(dateStr);
+  return d >= b.from && d < b.to;
+}
+
+function baseFromFixedInputs(){
+  const sumFixed = state.rows.reduce((acc,r)=> acc + (r.name && r.rub ? Number(r.rub) : 0), 0);
+  return Math.max(0, Number(budgetInput.value||0) - sumFixed);
+}
+function planForRow(r){
+  const base = baseFromFixedInputs();
+  if(r.rub && Number(r.rub)>0) return Number(r.rub);
+  if(r.pct && Number(r.pct)>0) return Number(r.pct)/100 * base;
+  return 0;
+}
+function spentForRow(r){
+  const list = state.tx[r.id] || [];
+  return list.filter(t=> inMonth(t.date||todayStr())).reduce((a,t)=> a + Number(t.amount||0), 0);
+}
+function leftForRow(r){ return planForRow(r) - spentForRow(r); }
+
+function save(){ 
+  state.budget = Number(budgetInput.value||0); 
+  state.monthFilter = monthPicker.value || '';
+  localStorage.setItem('budget-state-tx-plus', JSON.stringify(state)); 
+}
+
+function render(){
+  rowsWrap.innerHTML = '';
+  const inputSumEl = document.getElementById('inputSum');
+  const baseEl = document.getElementById('base');
+  const totalPlanRubEl = document.getElementById('totalPlanRub');
+  const totalSpentEl = document.getElementById('totalSpent');
+  const leftEl = document.getElementById('left');
+  const leftBox = document.getElementById('leftBox');
+  const budget = Number(budgetInput.value||0);
+
+  const sumInputRub = state.rows.reduce((acc,r)=> acc + (r.name && r.rub ? Number(r.rub) : 0), 0);
+  const base = baseFromFixedInputs();
+  inputSumEl.textContent = fmtRUB(sumInputRub);
+  baseEl.textContent = fmtRUB(base);
+
+  let totalPlan = 0, totalSpent = 0;
+
+  state.rows.forEach((r, idx) => {
+    if(r.section){
+      const row = document.createElement('div');
+      row.className = 'row section';
+      row.textContent = r.section;
+      rowsWrap.append(row);
+      return;
+    }
+    const row = document.createElement('div');
+    row.className = 'row';
+
+    const name = Object.assign(document.createElement('input'), {type:'text', value:r.name||'', placeholder:'Категория'});
+    const pct = Object.assign(document.createElement('input'), {type:'number', inputmode:'decimal', step:'0.01', min:'0', placeholder:'0,00', value: r.pct!==''&&r.pct!=null?r.pct:''});
+    const rub = Object.assign(document.createElement('input'), {type:'number', inputmode:'decimal', step:'1', min:'0', placeholder:'0', value: r.rub!==''&&r.rub!=null?r.rub:''});
+
+    const planOut = document.createElement('div'); planOut.className = 'muted col-hide';
+    const spentOut = document.createElement('div'); spentOut.className = 'muted';
+    const leftOut  = document.createElement('div'); leftOut.className = 'muted';
+
+    const qwrap = document.createElement('div'); qwrap.className = 'qbtns';
+    state.quick.forEach(val => {
+      const btn = Object.assign(document.createElement('button'), {className:'btn ghost', innerText: String(val)});
+      btn.addEventListener('click', ()=>{
+        ensureId(r);
+        const t = { id: uuid(), date: todayStr(), amount: Math.abs(val), note: 'Быстрое списание', ts: Date.now() };
+        state.tx[r.id] = state.tx[r.id] || [];
+        state.tx[r.id].push(t);
+        save(); render();
+      });
+      qwrap.append(btn);
+    });
+
+    const opBtn = Object.assign(document.createElement('button'), {className:'btn ghost', innerText:'Операции'});
+    const delBtn = Object.assign(document.createElement('button'), {className:'btn danger', innerText:'Удалить'});
+
+    const plan = planForRow(r);
+    const spent = spentForRow(r);
+    const left  = plan - spent;
+    totalPlan += plan;
+    totalSpent += spent;
+
+    planOut.textContent  = fmtRUB(plan);
+    spentOut.textContent = fmtRUB(spent);
+    leftOut.textContent  = fmtRUB(left);
+
+    name.addEventListener('input', ()=>{ r.name = name.value; save(); });
+    pct.addEventListener('input', ()=>{ r.pct = pct.value===''? '': Number(pct.value); save(); render(); });
+    rub.addEventListener('input', ()=>{ r.rub = rub.value===''? '': Number(rub.value); save(); render(); });
+    opBtn.addEventListener('click', ()=> openTxModal(r));
+    delBtn.addEventListener('click', ()=>{ state.rows.splice(idx,1); save(); render(); });
+
+    row.append(name, pct, rub, planOut, spentOut, leftOut, qwrap, opBtn, delBtn);
+    rowsWrap.append(row);
+  });
+
+  totalPlanRubEl.textContent = fmtRUB(totalPlan);
+  totalSpentEl.textContent   = fmtRUB(totalSpent);
+  leftEl.textContent         = fmtRUB(budget - totalSpent);
+  const leftNeg = (budget - totalSpent) < -0.5;
+  leftBox.classList.toggle('warn', leftNeg);
+  leftBox.classList.toggle('ok', !leftNeg);
+
+  save();
+}
+
+function ensureId(r){ if(!r.id) r.id = uuid(); }
+function openTxModal(row){
+  ensureId(row);
+  const modal = document.getElementById('txModal');
+  const listWrap = document.getElementById('txList');
+  document.getElementById('txTitle').textContent = `Операции — ${row.name||'Категория'}`;
+  const plan = planForRow(row), spent = spentForRow(row), left = leftForRow(row);
+  document.getElementById('txSubtitle').textContent = `План: ${fmtRUB(plan)} · Потрачено: ${fmtRUB(spent)} · Остаток: ${fmtRUB(left)}`;
+
+  listWrap.innerHTML = '';
+  const rows = (state.tx[row.id] || []).slice().sort((a,b)=> (a.ts||0)-(b.ts||0));
+  rows.forEach((t, i) => listWrap.append(txRow(row, t)));
+  modal.classList.add('show');
+
+  document.getElementById('txAdd').onclick = ()=>{
+    const t = { id: uuid(), date: todayStr(), amount: 0, note: '', ts: Date.now() };
+    state.tx[row.id] = state.tx[row.id] || [];
+    state.tx[row.id].push(t);
+    save(); render(); listWrap.append(txRow(row, t));
+  };
+  document.getElementById('txClose').onclick = ()=> modal.classList.remove('show');
+  document.getElementById('txExport').onclick = ()=>{
+    const list = (state.tx[row.id] || []);
+    const csv = 'date,category,amount,note\n' + list.map(t => [t.date, (row.name||'Категория').replace(/"/g,'""'), t.amount, (t.note||'').replace(/"/g,'""')].map(x=> `"${x}"`).join(',')).join('\n');
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([csv], {type:'text/csv;charset=utf-8'}));
+    a.download = `tx_${(row.name||'category').replace(/\s+/g,'_')}.csv`;
+    a.click();
+  };
+}
+
+function txRow(row, t){
+  const wrap = document.createElement('div');
+  wrap.className = 'tx-row';
+
+  const date = Object.assign(document.createElement('input'), {type:'date', value: t.date || todayStr()});
+  const note = Object.assign(document.createElement('input'), {type:'text', placeholder:'Комментарий', value: t.note||''});
+  const amount = Object.assign(document.createElement('input'), {type:'number', inputmode:'decimal', step:'1', placeholder:'0', value: t.amount||''});
+  const del = Object.assign(document.createElement('button'), {className:'btn danger', innerText:'×'});
+
+  date.addEventListener('input', ()=>{ t.date = date.value; t.ts = new Date(date.value).getTime() || Date.now(); save(); render(); });
+  note.addEventListener('input', ()=>{ t.note = note.value; save(); });
+  amount.addEventListener('input', ()=>{ t.amount = Number(amount.value||0); save(); render(); });
+  del.addEventListener('click', ()=>{
+    const arr = state.tx[row.id] || [];
+    const idx = arr.findIndex(x=> x.id===t.id);
+    if(idx>=0) arr.splice(idx,1);
+    save(); render(); wrap.remove();
+  });
+
+  wrap.append(date, note, amount, del);
+  return wrap;
+}
+
+// Header controls
+document.getElementById('addRow').addEventListener('click', ()=>{
+  state.rows.push({name:'Новая категория', id: uuid(), pct:'', rub:''});
+  save(); render();
+});
+document.getElementById('reset').addEventListener('click', ()=>{
+  if(confirm('Сбросить до исходного шаблона?')){
+    state = {budget:100000, rows:JSON.parse(JSON.stringify(defaults)), tx:{}, quick:[-500,-1000,-2000], monthFilter:''};
+    budgetInput.value = state.budget; monthPicker.value = ''; save(); render();
+  }
+});
+document.getElementById('exportJson').addEventListener('click', ()=>{
+  const data = JSON.stringify(state, null, 2);
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([data], {type:'application/json'}));
+  a.download = 'budget_export_with_tx.json';
+  a.click();
+});
+document.getElementById('importJson').addEventListener('click', ()=>{
+  const inp = document.createElement('input');
+  inp.type = 'file'; inp.accept = 'application/json';
+  inp.onchange = e => {
+    const file = e.target.files[0]; if(!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      try{
+        const obj = JSON.parse(reader.result);
+        if(obj && typeof obj==='object' && 'rows' in obj && 'budget' in obj){
+          (obj.rows||[]).forEach(r=>{ if(r && !r.section) { r.id = r.id || uuid(); }});
+          obj.tx = obj.tx || {};
+          obj.quick = obj.quick || [-500,-1000,-2000];
+          obj.monthFilter = obj.monthFilter || '';
+          state = obj; budgetInput.value = state.budget; monthPicker.value = state.monthFilter||''; save(); render();
+        } else alert('Неверный формат файла.');
+      } catch(err){ alert('Ошибка импорта: ' + err.message); }
+    };
+    reader.readAsText(file);
+  };
+  inp.click();
+});
+document.getElementById('exportCsv').addEventListener('click', ()=>{
+  const rows = [];
+  (state.rows||[]).forEach(r=>{
+    if(r.section) return;
+    const list = (state.tx[r.id]||[]).filter(t=> inMonth(t.date||todayStr()));
+    list.forEach(t=> rows.push([t.date, r.name||'', t.amount, t.note||'']));
+  });
+  const csv = 'date,category,amount,note\n' + rows.map(r=> r.map(x=> `"${String(x).replace(/"/g,'""')}"`).join(',')).join('\n');
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([csv], {type:'text/csv;charset=utf-8'}));
+  a.download = 'transactions.csv';
+  a.click();
+});
+document.getElementById('importCsv').addEventListener('click', ()=>{
+  const inp = document.createElement('input');
+  inp.type = 'file'; inp.accept = '.csv,text/csv';
+  inp.onchange = e => {
+    const file = e.target.files[0]; if(!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      try{
+        const text = reader.result;
+        const lines = text.split(/\r?\n/).filter(x=>x.trim());
+        if(lines.length<2) throw new Error('Файл пустой');
+        const rawHeader = lines[0].trim();
+        const delim = rawHeader.includes(';') ? ';' : ',';
+        const headers = rawHeader.split(delim).map(h=> h.trim().toLowerCase());
+        const idx = {
+          date: headers.findIndex(h=> /date|дата/.test(h)),
+          cat: headers.findIndex(h=> /category|категор/.test(h)),
+          amount: headers.findIndex(h=> /amount|сумм/.test(h)),
+          note: headers.findIndex(h=> /note|коммент|описан/.test(h)),
+        };
+        if(idx.date<0 || idx.amount<0){ throw new Error('Нет колонок даты/суммы'); }
+        let imported = 0;
+        for(let i=1;i<lines.length;i++){
+          const parts = lines[i].split(delim).map(x=> x.replace(/^"|"$/g,'').replace(/""/g,'"').trim());
+          if(parts.length < 2) continue;
+          const date = parts[idx.date] || todayStr();
+          const amountStr = (parts[idx.amount]||'').replace(' ', '').replace(',', '.');
+          const amount = Math.abs(parseFloat(amountStr)) || 0;
+          if(!amount) continue;
+          const cat = idx.cat>=0 ? (parts[idx.cat]||'') : '';
+          const note = idx.note>=0 ? (parts[idx.note]||'') : '';
+          let row = state.rows.find(r=> !r.section && (r.name||'').toLowerCase() === (cat||'').toLowerCase());
+          if(!row){
+            row = {name: cat||'Импорт', id: uuid(), pct:'', rub:''};
+            state.rows.push(row);
+          }
+          state.tx[row.id] = state.tx[row.id] || [];
+          state.tx[row.id].push({ id: uuid(), date, amount, note, ts: new Date(date).getTime()||Date.now() });
+          imported++;
+        }
+        save(); render();
+        alert('Импортировано операций: ' + imported);
+      } catch(err){ alert('Ошибка импорта CSV: ' + err.message); }
+    };
+    reader.readAsText(file, 'utf-8');
+  };
+  inp.click();
+});
+document.getElementById('thisMonth').addEventListener('click', ()=>{
+  const d = new Date(); monthPicker.value = d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0'); save(); render();
+});
+document.getElementById('prevMonth').addEventListener('click', ()=>{
+  const d = new Date(); d.setMonth(d.getMonth()-1); monthPicker.value = d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0'); save(); render();
+});
+document.getElementById('allTime').addEventListener('click', ()=>{ monthPicker.value = ''; save(); render(); });
+monthPicker.addEventListener('input', ()=>{ save(); render(); });
+budgetInput.addEventListener('input', ()=>{ save(); render(); });
+
+// Modal close on click outside
+document.getElementById('txModal').addEventListener('click', (e)=>{
+  if(e.target.id==='txModal') e.currentTarget.classList.remove('show');
+});
+
+render();
+</script>
+</body>
+</html>
