@@ -5,7 +5,7 @@ set -e
 # Usage: ./quick-deploy.sh [user] [app_path]
 
 USER=${1:-root}
-APP_PATH=${2:-/root/budget-app}
+APP_PATH=${2:-/data/budget-app}
 
 echo "🚀 Quick HTTP deployment for user: $USER, path: $APP_PATH"
 
