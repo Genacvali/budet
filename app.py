@@ -352,6 +352,111 @@ def health_check():
             "timestamp": date.today().isoformat()
         }), 500
 
+# === NEW: JSON API для Excel-грида ===
+
+@app.get("/api/state")
+def api_state():
+    """Отдаём всё для рендера грида: строки бюджета + summary + источники."""
+    ym = request.args.get("m") or date.today().strftime("%Y-%m")
+    rows, summary = month_data(ym)
+    return jsonify({
+        "ym": ym, "prev": ym_prev(ym),
+        "sources": list(SOURCES),
+        "rows": rows,
+        "summary": summary,
+    })
+
+@app.post("/api/category/add")
+def api_category_add():
+    data = request.json
+    name = (data.get("name") or "").strip()
+    source = data.get("source")
+    percent = data.get("percent")
+    fixed = data.get("fixed_rub")
+    if not name or source not in SOURCES:
+        return jsonify({"error": "bad input"}), 400
+    con = db(); cur = con.cursor()
+    cur.execute("INSERT OR IGNORE INTO categories(name,source,percent,fixed_rub) VALUES(?,?,?,?)",
+                (name, source, percent, fixed))
+    con.commit(); con.close()
+    return api_state()
+
+@app.post("/api/category/update")
+def api_category_update():
+    data = request.json
+    cid = int(data["id"])
+    
+    # Build update query dynamically based on provided fields
+    updates = []
+    params = []
+    
+    if "name" in data:
+        updates.append("name=?")
+        params.append(data["name"])
+    
+    if "source" in data:
+        updates.append("source=?") 
+        params.append(data["source"])
+        
+    if "percent" in data:
+        updates.append("percent=?")
+        params.append(data["percent"] if data["percent"] not in ("", None) else None)
+        
+    if "fixed_rub" in data:
+        updates.append("fixed_rub=?")
+        params.append(data["fixed_rub"] if data["fixed_rub"] not in ("", None) else None)
+    
+    if not updates:
+        return api_state()  # No changes
+        
+    params.append(cid)
+    
+    con = db(); cur = con.cursor()
+    cur.execute(f"UPDATE categories SET {', '.join(updates)} WHERE id=?", params)
+    con.commit(); con.close()
+    return api_state()
+
+@app.post("/api/category/delete")
+def api_category_delete():
+    cid = int(request.json["id"])
+    con = db(); cur = con.cursor()
+    # удаляем категорию и связанные минусы
+    cur.execute("DELETE FROM expenses WHERE category_id=?", (cid,))
+    cur.execute("DELETE FROM categories WHERE id=?", (cid,))
+    con.commit(); con.close()
+    return api_state()
+
+@app.post("/api/minus")
+def api_minus():
+    """Быстрое списание: {ym, category_id, amount}"""
+    data = request.json
+    ym = data.get("ym") or date.today().strftime("%Y-%m")
+    cid = int(data["category_id"])
+    amount = float(data.get("amount") or 0)
+    if amount <= 0:
+        return jsonify({"error": "amount must be > 0"}), 400
+    con = db(); cur = con.cursor()
+    cur.execute("INSERT INTO expenses(ym,category_id,amount) VALUES(?,?,?)", (ym, cid, amount))
+    con.commit(); con.close()
+    return api_state()
+
+@app.post("/api/income/add")
+def api_income_add():
+    data = request.json
+    dt = data["dt"]
+    src = data["source"]
+    amount = float(data["amount"])
+    ym = dt[:7]
+    con = db(); cur = con.cursor()
+    cur.execute("INSERT INTO incomes(dt,source,amount,ym) VALUES(?,?,?,?)",(dt,src,amount,ym))
+    con.commit(); con.close()
+    return api_state()
+
+@app.get("/grid")
+def grid_ui():
+    ym = request.args.get("m") or date.today().strftime("%Y-%m")
+    return render_template("grid.html", ym=ym)
+
 if __name__ == "__main__":
     init_db()
     app.run(host=os.getenv("HOST","0.0.0.0"), port=int(os.getenv("PORT","8000")), debug=True)
