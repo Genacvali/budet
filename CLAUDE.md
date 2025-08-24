@@ -4,120 +4,145 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-This is a Russian-language iOS-friendly Progressive Web Application (PWA) called "Бюджет — конверты" (Budget - Envelopes) that implements envelope budgeting methodology. The app helps users allocate their budget across different spending categories using both percentage-based and fixed amount allocations.
+This is a Russian-language Flask-based budget tracking application that implements envelope budgeting methodology with automatic CSV import from Tinkoff Bank. The app supports income allocation across different sources (ЗП/Аванс/Декретные), automatic transaction categorization through rules and merchant mapping, and monthly budget tracking with carryover calculations.
 
 ## Architecture
 
-This is a single-page application with no build process or external dependencies:
+This is a server-based Flask application with SQLite database:
 
-- **Frontend**: Pure HTML/CSS/JavaScript (no frameworks)
-- **Storage**: localStorage for persistence (key: `budget-ios-state`)
-- **PWA**: iOS-optimized service worker for offline functionality
-- **Deployment**: Static files served directly, works on GitHub Pages subpaths
+- **Backend**: Flask with SQLite (WAL mode) for persistence
+- **Frontend**: HTML templates with Pico CSS framework
+- **CSV Processing**: Tinkoff bank statement parsing with automatic categorization
+- **Deployment**: Gunicorn + systemd service, designed for VPS hosting
 
 ### Key Files Structure
 
-- `index.html` - Complete application with embedded CSS and JavaScript
-- `manifest.json` - PWA manifest with relative paths for GitHub Pages (`start_url` and `scope` = ".")
-- `service-worker.js` - Service worker with cache version `budget-ios-v1`
-- `README.txt` - Russian deployment instructions
-- `icons/` - PWA icons including Apple touch icon placeholders
+- `app.py` - Main Flask application with all routes and business logic
+- `services.py` - CSV parsing, text normalization, and rule processing utilities
+- `requirements.txt` - Python dependencies (Flask, python-dotenv, gunicorn)
+- `.env.example` - Environment configuration template
+- `templates/` - Jinja2 HTML templates (base, index, merchants, rules)
+- `budget.db` - SQLite database (auto-created on first run)
 
-### iOS PWA Optimizations
+### Database Schema
 
-**Meta Tags**:
-- `apple-mobile-web-app-capable="yes"` - Enables standalone mode
-- `apple-mobile-web-app-status-bar-style="black-translucent"` - Status bar styling
-- `apple-mobile-web-app-title="Бюджет"` - App title on home screen
-- `viewport-fit=cover, user-scalable=no` - Handles notch and prevents zoom
+**Core Tables**:
+- `categories` - Budget categories with source allocation and percent/fixed amounts
+- `incomes` - Income entries by source and date
+- `expenses` - Monthly expenses by category
+- `merchant_map` - Learned merchant-to-category mappings
+- `rules` - Pattern-based categorization rules (keyword/regex)
 
-**CSS Safe Areas**:
-- Uses `env(safe-area-inset-*)` for proper spacing around iPhone notch/gesture areas
-- 16px input font sizes to prevent iOS zoom
-- Dark theme optimized for mobile viewing
-
-**Install Hint**:
-- Shows Safari installation hint once (`installHint` component)
-- Guides users to "Share → Add to Home Screen"
-
-## UI Structure
-
-### Three-Tab Navigation
-- **Plan** (`#view-plan`) - Budget categories and allocations
-- **Operations** (`#view-ops`) - Transaction journal with filters
-- **More** (`#view-settings`) - Settings and data management
-
-### Key Components
-- **FAB** (`#fabAdd`) - Floating action button for quick transaction entry
-- **Transaction Modal** (`#txModal`) - Category-specific transaction CRUD
-- **Bottom Tabs** - Mobile-optimized navigation with `.active` state
-
-## Data Model
-
-The application uses localStorage under key `budget-ios-state`:
-
-```javascript
-{
-  budget: Number,           // Total budget amount
-  rows: Array,             // Categories with sections
-  tx: Object,              // Transactions by category ID
-  quick: Array,            // Quick amounts (e.g. [-500, -1000, -2000])
-  monthFilter: String,     // Current month filter (YYYY-MM or "")
-  currency: String         // Currency symbol (default "₽")
-}
-```
-
-### Budget Calculations
-- **Base**: `budget - Σ(fixed rub amounts)`
-- **Plan per category**: `rub` (if set) OR `pct/100 * base`
-- **Spent per category**: Sum of transactions in selected period
-- **Remaining**: `plan - spent`
+**Sources**: Fixed list of income sources: "ЗП", "Аванс", "Декретные"
 
 ## Development Commands
 
-No build system required. Development workflow:
+**Local Development**:
+```bash
+# Setup
+python3 -m venv .venv
+. .venv/bin/activate
+pip install -r requirements.txt
+cp .env.example .env
 
-1. **Serve locally**: `python -m http.server` or VS Code Live Server
-2. **Testing**: Manual testing in browser and iOS Safari
-3. **Cache updates**: Increment `CACHE` version in `service-worker.js` when updating assets
-4. **Deployment**: Upload to static hosting (GitHub Pages ready with relative paths)
+# Run development server
+python app.py  # http://localhost:8000
+```
 
-## Import/Export Features
+**Production Deployment**:
+```bash
+# Install dependencies on Ubuntu/Debian
+sudo apt update && sudo apt install -y python3-venv
 
-### CSV Format
-- Headers: `date,category,amount,note` (supports Russian equivalents)
-- Delimiters: `,` or `;` (auto-detected)
-- Auto-creates missing categories during import
-- Export filters by selected time period
+# Setup systemd service
+sudo systemctl enable --now budget.service
 
-### JSON Format
-- Complete application state export/import
-- Preserves all data including transactions and settings
+# Web server (choose one)
+# Caddy (automatic HTTPS)
+sudo apt install -y caddy
+# Nginx (reverse proxy)
+sudo apt install -y nginx
+```
 
-## Key Technical Considerations
+## Key Features
 
-### GitHub Pages Compatibility
-- Uses relative paths (`"."`) for `start_url` and `scope`
-- Service worker registration: `./service-worker.js`
-- Works seamlessly on subpaths like `/budet/`
+### CSV Import Workflow
+1. **Upload**: Tinkoff CSV file via `/import-csv` endpoint
+2. **Parse**: Extract RUB expenses, normalize merchant descriptions
+3. **Categorize**: Apply merchant mappings → rules → mark as "unknown"
+4. **Learn**: Map unknown merchants to categories for future imports
+5. **Store**: Create expense records for the target month
 
-### Mobile UX Patterns
-- Large touch targets (minimum 44px)
-- Swipe-friendly card layouts
-- Context-aware input types (`inputmode="decimal"`)
-- Prevents accidental zoom with `user-scalable=no`
+### Budget Calculations
+- **Carryover**: `prev_income - prev_expenses` per source
+- **Base**: `current_income + carryover - fixed_allocations` per source  
+- **Plan**: `fixed_rub` OR `percent * base` per category
+- **Remaining**: `plan - spent` per category
+
+### Smart Categorization
+1. **Merchant Map**: Exact normalized merchant name → category
+2. **Rules**: Keyword/regex patterns → category (processed in reverse order)
+3. **Manual**: Unmatched transactions for user assignment
+
+## Data Flow
+
+**Monthly Budget Process**:
+1. Add income entries by source and date
+2. Import bank CSV (creates expenses + unknown merchants)
+3. Map unknown merchants to categories
+4. Create rules for recurring patterns
+5. View plan vs actual with carryover calculations
+
+**File Processing**:
+- CSV fields: "Сумма операции", "Описание", "MCC", "Дата операции"
+- Filters: RUB currency, negative amounts (expenses only)
+- Normalization: Unicode, lowercase, whitespace cleanup
+- Merchant mapping: Stores normalized description → category_id
+
+## API Endpoints
+
+**Core Pages**:
+- `GET /` - Main budget view with month selector
+- `GET /import-csv` - CSV upload form
+- `GET /rules` - Rule management interface
+- `GET /export` - JSON export of all data
+
+**CRUD Operations**:
+- `POST /category/add|update` - Category management
+- `POST /income/add` - Income entry creation
+- `POST /minus/add` - Quick expense entry
+- `POST /merchants/map` - Merchant categorization
+- `POST /rules/add` - Pattern rule creation
+
+## Technical Considerations
 
 ### Performance
-- Single HTML file with embedded assets
-- Efficient localStorage operations
-- Service worker caching for offline use
-- No external dependencies or build process
+- SQLite WAL mode for concurrent access
+- Single-table queries with proper indexing
+- Efficient text normalization and pattern matching
 
-## Potential Enhancements
+### Data Integrity
+- Foreign key constraints with CASCADE deletion
+- Input validation and sanitization
+- Atomic transactions for import operations
 
-1. **Theming**: Light theme toggle with `prefers-color-scheme`
-2. **Drag & Drop**: Category reordering with fixed essential categories
-3. **Quick Actions**: In-row spending buttons for categories
-4. **Sync**: Webhook integration for external data sync
-5. **Reports**: Weekly/monthly summaries and charts
-6. **Icons**: Replace placeholder icons with branded assets
+### Deployment
+- Minimal resource requirements (1 CPU, 1GB RAM sufficient)
+- Systemd service management
+- Daily database backup recommended: `cp budget.db backup/budget-$(date +%F).db`
+
+## Common Development Tasks
+
+**Adding New Rules**:
+- Keywords: `taxi;яндекс;uber` → category
+- Regex: `\btaxi\b|\byandex\b` → category
+
+**CSV Import Testing**:
+- Use sample Tinkoff export files
+- Verify RUB filtering and amount parsing
+- Test merchant normalization edge cases
+
+**Database Migration**:
+- Export via `/export` endpoint
+- Import via `/import` endpoint (replaces all data)
+- Manual SQL for schema changes

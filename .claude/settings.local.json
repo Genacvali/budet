@@ -2,7 +2,9 @@
   "permissions": {
     "allow": [
       "Bash(git config:*)",
-      "Bash(git pull:*)"
+      "Bash(git pull:*)",
+      "Bash(rm:*)",
+      "Bash(mkdir:*)"
     ],
     "deny": [],
     "ask": []

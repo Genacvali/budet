@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% block content %}
+<h3 class="mb-3">Импорт CSV (Тинькофф)</h3>
+
+{% if stage == "upload" %}
+<form method="post" action="/import-csv" enctype="multipart/form-data" class="row g-2 align-items-end">
+  <div class="col-auto">
+    <label class="form-label">Месяц</label>
+    <input class="form-control" type="month" name="ym" value="{{ ym }}" required>
+  </div>
+  <div class="col-auto">
+    <label class="form-label">Файл CSV</label>
+    <input class="form-control" type="file" name="file" accept=".csv" required>
+  </div>
+  <div class="col-auto">
+    <button class="btn btn-primary">Загрузить</button>
+  </div>
+</form>
+<p class="text-secondary small mt-2">Берём только расходы в RUB. Поля: «Сумма операции/Сумма», «Описание», «MCC», «Дата операции/Дата».</p>
+{% endif %}
+
+{% if stage == "map" %}
+<div class="alert alert-success">Создано расходов: <b>{{ created }}</b></div>
+<p>Назначьте категории для неразобранных мерчантов — дальше будет автоматически.</p>
+<form method="post" action="/merchants/map">
+  <input type="hidden" name="ym" value="{{ ym }}">
+  <div class="table-responsive">
+    <table class="table table-sm align-middle">
+      <thead class="table-dark"><tr><th>Мерчант</th><th>Сумма</th><th>Категория</th></tr></thead>
+      <tbody>
+      {% for name, total in merchants %}
+        <tr>
+          <td class="small">{{ name }}</td>
+          <td class="num">{{ "%.0f"|format(total) }} ₽</td>
+          <td>
+            <select class="form-select form-select-sm" name="map-{{ name }}">
+              <option value="">— выбрать —</option>
+              {% for c in categories %}
+                <option value="{{ c.id }}">{{ c.name }} ({{ c.source }})</option>
+              {% endfor %}
+            </select>
+          </td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <button class="btn btn-primary">Сохранить</button>
+  <a class="btn btn-outline-secondary" href="/import-csv?m={{ ym }}">Назад</a>
+</form>
+{% endif %}
+{% endblock %}

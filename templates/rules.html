@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% block content %}
+<h3 class="mb-3">Правила классификации</h3>
+
+<form method="post" action="/rules/add" class="row g-2 align-items-end mb-3">
+  <div class="col-md">
+    <label class="form-label">Ключи через ; или шаблон RegEx</label>
+    <input class="form-control" name="pattern" placeholder="taxi;yandex / ^magnet.*$" required>
+  </div>
+  <div class="col-auto">
+    <label class="form-label">RegEx?</label><br>
+    <input class="form-check-input" type="checkbox" name="is_regex">
+  </div>
+  <div class="col-auto">
+    <label class="form-label">Категория</label>
+    <select class="form-select" name="category_id" required>
+      {% for c in categories %}<option value="{{ c.id }}">{{ c.name }}</option>{% endfor %}
+    </select>
+  </div>
+  <div class="col-auto">
+    <button class="btn btn-primary">Добавить</button>
+  </div>
+</form>
+
+<div class="table-responsive">
+  <table class="table table-sm">
+    <thead class="table-dark"><tr><th>ID</th><th>Паттерн</th><th>regex?</th><th>Категория</th></tr></thead>
+    <tbody>
+      {% for r in rules %}
+      <tr>
+        <td>{{ r.id }}</td>
+        <td class="small">{{ r.pattern }}</td>
+        <td>{{ "да" if r.is_regex else "нет" }}</td>
+        <td>{{ r.category_id }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}
