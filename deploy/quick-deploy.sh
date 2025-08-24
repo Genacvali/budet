@@ -4,8 +4,8 @@ set -e
 # Quick HTTP-only deployment for Budget App
 # Usage: ./quick-deploy.sh [user] [app_path]
 
-USER=${1:-ubuntu}
-APP_PATH=${2:-/home/$USER/budget-app}
+USER=${1:-root}
+APP_PATH=${2:-/root/budget-app}
 
 echo "🚀 Quick HTTP deployment for user: $USER, path: $APP_PATH"
 
@@ -69,7 +69,7 @@ server {
     server_name _;
 
     location /static/ {
-        alias /home/ubuntu/budget-app/static/;
+        alias $APP_PATH/static/;
         expires 30d;
     }
 
