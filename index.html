@@ -130,7 +130,23 @@
 <script>
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('./service-worker.js').catch(()=>{});
+    navigator.serviceWorker.register('./service-worker.js').then(reg => {
+      function onNew(worker){
+        worker.addEventListener('statechange', () => {
+          if (worker.state === 'installed' && navigator.serviceWorker.controller) {
+            // показать кнопку "Обновить"
+            const btn = document.createElement('button');
+            btn.textContent = 'Обновить приложение';
+            btn.style.cssText = 'position:fixed;left:12px;right:12px;bottom:80px;padding:12px;border-radius:12px;border:1px solid #22314e;background:#162748;color:#fff;z-index:9999';
+            btn.onclick = () => reg.waiting && reg.waiting.postMessage({type:'SKIP_WAITING'});
+            document.body.appendChild(btn);
+          }
+        });
+      }
+      if (reg.installing) onNew(reg.installing);
+      reg.addEventListener('updatefound', () => reg.installing && onNew(reg.installing));
+      navigator.serviceWorker.addEventListener('controllerchange', () => location.reload());
+    });
   });
 }
 
