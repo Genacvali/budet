@@ -1,6 +1,6 @@
 {
-  "name": "Budget PWA",
-  "short_name": "Budget",
+  "name": "CrystalBudget",
+  "short_name": "Crystal",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#0f172a",
