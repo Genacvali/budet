@@ -33,7 +33,8 @@ class CategoryType(str, Enum):
 class CategoryBase(BaseModel):
     name: str = Field(..., min_length=1, max_length=100)
     type: CategoryType
-    color: str = Field(..., regex=r'^#[0-9A-Fa-f]{6}$')
+    # Pydantic v2 → pattern вместо regex
+    color: str = Field(..., pattern=r'^#[0-9A-Fa-f]{6}$')
     icon: Optional[str] = Field(None, max_length=50)
 
 class CategoryCreate(CategoryBase):
@@ -41,7 +42,8 @@ class CategoryCreate(CategoryBase):
 
 class CategoryUpdate(BaseModel):
     name: Optional[str] = Field(None, min_length=1, max_length=100)
-    color: Optional[str] = Field(None, regex=r'^#[0-9A-Fa-f]{6}$')
+    # Тоже меняем на pattern
+    color: Optional[str] = Field(None, pattern=r'^#[0-9A-Fa-f]{6}$')
     icon: Optional[str] = Field(None, max_length=50)
 
 class Category(CategoryBase):
