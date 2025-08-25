@@ -1,0 +1,14 @@
+[Unit]
+Description=Budget PWA API (FastAPI/Uvicorn)
+After=network.target
+
+[Service]
+WorkingDirectory=/data/budet/budget-pwa/backend
+Environment=DB_PATH=/data/budet/budget-pwa/backend/data/budget.db
+Environment=JWT_SECRET=CHANGE_ME_RANDOM_SECRET
+ExecStart=/data/budet/venv/bin/python -m uvicorn app.main:app --host 127.0.0.1 --port 8000 --workers 1
+Restart=on-failure
+User=root
+
+[Install]
+WantedBy=multi-user.target

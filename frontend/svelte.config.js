@@ -1,11 +1,14 @@
 import adapter from '@sveltejs/adapter-static';
-import { vitePreprocess } from '@sveltejs/vite-plugin-svelte/preprocess';
+import sveltePreprocess from 'svelte-preprocess';
 
 export default {
-  preprocess: vitePreprocess(),
+  preprocess: sveltePreprocess(),
   kit: {
-    adapter: adapter(),
-    alias: { $lib: 'src/lib' },
-    serviceWorker: { register: true }
+    adapter: adapter({
+      fallback: 'index.html',
+      strict: false
+    }),
+    serviceWorker: { register: false }, // можно включить позже
+    alias: { $lib: 'src/lib' }
   }
 };
