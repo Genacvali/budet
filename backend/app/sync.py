@@ -1,9 +1,10 @@
-from fastapi import APIRouter, Depends, HTTPException, Request
+from typing import Optional
+from fastapi import APIRouter, Request, Depends
 from .db import get_db
 from .models import SyncPush
 import time
 
-router = APIRouter(prefix="/api/sync", tags=["sync"])
+router = APIRouter()
 
 TABLES = {
     "categories": ["id","user_id","name","kind","icon","color","active","limit_type","limit_value","created_at","updated_at","deleted_at"],
@@ -12,8 +13,12 @@ TABLES = {
     "operations": ["id","user_id","type","source_id","category_id","wallet","amount_cents","currency","rate","date","note","created_at","updated_at","deleted_at"],
 }
 
-@router.get("/pull")
-async def pull(since: str | None = None, request: Request = None, db = Depends(get_db)):
+@router.get("/api/sync/pull")
+async def pull(
+    since: Optional[str] = None,
+    request: Request = None,
+    db = Depends(get_db)
+):
     claims = request.state.claims
     uid = claims["uid"]
     since = since or "1970-01-01T00:00:00Z"
@@ -27,7 +32,7 @@ async def pull(since: str | None = None, request: Request = None, db = Depends(g
     payload["server_time"] = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
     return payload
 
-@router.post("/push")
+@router.post("/api/sync/push")
 async def push(body: SyncPush, request: Request, db = Depends(get_db)):
     claims = request.state.claims
     uid = claims["uid"]
