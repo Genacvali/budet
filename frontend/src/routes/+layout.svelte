@@ -19,11 +19,11 @@
   });
 
   const nav = [
-    { href: '/',       label: 'Домой',    icon: 'M10 3l2 4 4 .5-3 3 .7 4.2L10 13l-3.7 1.7.7-4.2-3-3 4-.5 2-4' },
-    { href: '/add',    label: 'Добавить', icon: 'M10 4v12M4 10h12' },
-    { href: '/plan',   label: 'План',     icon: 'M3 14h14M3 10h14M3 6h14' },
-    { href: '/reports',label: 'Отчёты',   icon: 'M4 14l3-4 3 2 4-6 2 3' },
-    { href: '/settings',label:'Настройки',icon: 'M4 10h12M8 6h8M2 14h8' }
+    { href: '/',        label: 'Домой',     icon: 'M10 3l2 4 4 .5-3 3 .7 4.2L10 13l-3.7 1.7.7-4.2-3-3 4-.5 2-4' },
+    { href: '/minus',   label: 'Минус',     icon: 'M4 10h12' },
+    { href: '/plan',    label: 'План',      icon: 'M3 14h14M3 10h14M3 6h14' },
+    { href: '/reports', label: 'Отчёты',    icon: 'M4 14l3-4 3 2 4-6 2 3' },
+    { href: '/settings',label: 'Настройки', icon: 'M4 10h12M8 6h8M2 14h8' }
   ];
 </script>
 

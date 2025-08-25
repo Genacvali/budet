@@ -18,8 +18,8 @@
   });
   
   async function loadData() {
-    categories = await db.categories.where('deleted_at').equals(null).toArray();
-    sources = await db.sources.where('deleted_at').equals(null).toArray();
+    categories = (await db.categories.toArray()).filter(c => !c.deleted_at);
+    sources = (await db.sources.toArray()).filter(s => !s.deleted_at);
   }
   
   $: filteredCategories = categories.filter(c => c.kind === type);

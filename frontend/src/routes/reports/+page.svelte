@@ -28,8 +28,8 @@
   async function loadData() {
     loading = true;
     
-    categories = await db.categories.where('deleted_at').equals(null).toArray();
-    operations = await db.operations.where('deleted_at').equals(null).toArray();
+    categories = (await db.categories.toArray()).filter(c => !c.deleted_at);
+    operations = (await db.operations.toArray()).filter(o => !o.deleted_at);
     
     calculateStats();
     loading = false;
