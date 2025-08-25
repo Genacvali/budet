@@ -2,7 +2,7 @@ package main
 
 import (
     "context"
-    "io/ioutil"
+    "io"
     "log"
     "net/http"
     "os"
@@ -37,7 +37,11 @@ func main() {
     sqlDB, err := db.Open(dbPath); if err != nil { log.Fatal(err) }
     
     // Run migrations
-    migrationSQL, err := ioutil.ReadFile("db/migrate.sql")
+    migrationFile, err := os.Open("db/migrate.sql")
+    if err != nil { log.Fatal("Failed to open migration file:", err) }
+    defer migrationFile.Close()
+    
+    migrationSQL, err := io.ReadAll(migrationFile)
     if err != nil { log.Fatal("Failed to read migration file:", err) }
     if _, err := sqlDB.Exec(string(migrationSQL)); err != nil { log.Fatal("Migration failed:", err) }
 

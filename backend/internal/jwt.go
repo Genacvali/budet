@@ -2,11 +2,17 @@ package internal
 
 import (
     "errors"
+    "os"
     "github.com/golang-jwt/jwt/v5"
     "time"
 )
 
-var jwtKey = []byte("CHANGE_ME_SUPER_SECRET") // вынеси в ENV
+func getJWTKey() []byte {
+    if secret := os.Getenv("JWT_SECRET"); secret != "" {
+        return []byte(secret)
+    }
+    return []byte("CHANGE_ME_SUPER_SECRET_DEFAULT_KEY")
+}
 
 type Claims struct {
     UserID string `json:"uid"`
@@ -22,11 +28,11 @@ func MakeToken(uid, email string, ttl time.Duration) (string, error) {
             IssuedAt:  jwt.NewNumericDate(time.Now()),
         },
     }
-    return jwt.NewWithClaims(jwt.SigningMethodHS256, claims).SignedString(jwtKey)
+    return jwt.NewWithClaims(jwt.SigningMethodHS256, claims).SignedString(getJWTKey())
 }
 
 func ParseToken(t string) (*Claims, error) {
-    token, err := jwt.ParseWithClaims(t, &Claims{}, func(token *jwt.Token) (interface{}, error) { return jwtKey, nil })
+    token, err := jwt.ParseWithClaims(t, &Claims{}, func(token *jwt.Token) (interface{}, error) { return getJWTKey(), nil })
     if err != nil { return nil, err }
     if claims, ok := token.Claims.(*Claims); ok && token.Valid {
         return claims, nil
