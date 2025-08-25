@@ -7,11 +7,14 @@ import (
     "time"
 )
 
-func getJWTKey() []byte {
-    if secret := os.Getenv("JWT_SECRET"); secret != "" {
-        return []byte(secret)
+var jwtKey = []byte(getJWTSecret())
+
+func getJWTSecret() string {
+    if v := os.Getenv("JWT_SECRET"); v != "" {
+        return v
     }
-    return []byte("CHANGE_ME_SUPER_SECRET_DEFAULT_KEY")
+    // fallback только для dev
+    return "DEV_ONLY_CHANGE_ME"
 }
 
 type Claims struct {
@@ -28,11 +31,11 @@ func MakeToken(uid, email string, ttl time.Duration) (string, error) {
             IssuedAt:  jwt.NewNumericDate(time.Now()),
         },
     }
-    return jwt.NewWithClaims(jwt.SigningMethodHS256, claims).SignedString(getJWTKey())
+    return jwt.NewWithClaims(jwt.SigningMethodHS256, claims).SignedString(jwtKey)
 }
 
 func ParseToken(t string) (*Claims, error) {
-    token, err := jwt.ParseWithClaims(t, &Claims{}, func(token *jwt.Token) (interface{}, error) { return getJWTKey(), nil })
+    token, err := jwt.ParseWithClaims(t, &Claims{}, func(token *jwt.Token) (interface{}, error) { return jwtKey, nil })
     if err != nil { return nil, err }
     if claims, ok := token.Claims.(*Claims); ok && token.Valid {
         return claims, nil
