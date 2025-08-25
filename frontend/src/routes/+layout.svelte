@@ -15,7 +15,7 @@
   });
 
   // Периодический синк каждые 5 минут
-  let syncInterval: NodeJS.Timeout;
+  let syncInterval: ReturnType<typeof setInterval>;
   onMount(() => {
     if ($isAuthenticated) {
       syncInterval = setInterval(async () => {
