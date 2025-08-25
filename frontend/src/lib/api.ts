@@ -14,9 +14,8 @@ export function clearToken() {
   if (browser) localStorage.removeItem('jwt');
 }
 
-function authHeaders() { 
-  return token ? { 'Authorization': 'Bearer ' + token } : {}; 
-}
+const authHeaders = (): Record<string, string> =>
+  token ? { Authorization: 'Bearer ' + token } : {};
 
 export async function register(email: string, password: string) {
   const res = await fetch(`${API}/api/auth/register`, {
@@ -48,7 +47,7 @@ export async function pull() {
   const res = await fetch(`${API}/api/sync/pull?since=${encodeURIComponent(since)}`, { headers: authHeaders() });
   if (!res.ok) return;
   const data = await res.json();
-  await db.transaction('rw', db.categories, db.sources, db.rules, db.operations, db.meta, async () => {
+  await db.transaction('rw', [db.categories, db.sources, db.rules, db.operations, db.meta], async () => {
     for (const t of ['categories','sources','rules','operations'] as const) {
       const rows = data[t] as any[];
       for (const row of rows) await (db as any)[t].put(row);
@@ -68,7 +67,7 @@ export async function push() {
   };
   await fetch(`${API}/api/sync/push`, {
     method: 'POST',
-    headers: { 'Content-Type':'application/json', ...authHeaders() },
+    headers: Object.assign({ 'Content-Type': 'application/json' }, authHeaders()),
     body: JSON.stringify(payload)
   }); // SW фоново отправит, если оффлайн
 }

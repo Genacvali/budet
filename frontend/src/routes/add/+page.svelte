@@ -18,11 +18,18 @@
   });
   
   async function loadData() {
-    categories = await db.categories.where('deleted_at').equals(null).toArray();
-    sources = await db.sources.where('deleted_at').equals(null).toArray();
+    const allCats = await db.categories.toArray();
+    const allSources = await db.sources.toArray();
+    categories = allCats.filter(c => !c.deleted_at);
+    sources = allSources.filter(s => !s.deleted_at);
   }
   
   $: filteredCategories = categories.filter(c => c.kind === (type === 'income' ? 'income' : 'expense'));
+  
+  // Reload data when type changes
+  $: if (type) {
+    loadData();
+  }
   
   async function save() {
     if (!amount || !category_id) return;
