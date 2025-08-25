@@ -17,7 +17,7 @@ export interface Source {
 
 export interface Rule {
   id: string; user_id: string; source_id: string; category_id: string;
-  percent: number; cap_cents?: number|null;
+  percent: number; cap_cents?: number|null; fixed_cents?: number|null; // NEW
   created_at: string; updated_at: string; deleted_at?: string|null;
 }
 

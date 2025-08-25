@@ -1,241 +1,180 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { db, type Category, type Operation } from '$lib/db';
+  import { db, type Category, type Source, type Rule } from '$lib/db';
+  import { browser } from '$app/environment';
 
   let categories: Category[] = [];
-  let operations: Operation[] = [];
-  let planData: Array<{
-    category: Category;
-    planned: number;
-    actual: number;
-    remaining: number;
-    percentage: number;
-    status: 'ok' | 'warning' | 'danger';
-  }> = [];
+  let sources: Source[] = [];
+  let rules: Rule[] = [];
 
-  onMount(async () => {
-    categories = (await db.categories.toArray()).filter(c => !c.deleted_at);
-    operations = (await db.operations.toArray()).filter(o => !o.deleted_at);
-    
-    // Группируем операции по категориям за текущий месяц
-    const now = new Date();
-    const currentMonth = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');
-    
-    const monthlyOperations = operations.filter(op => op.date.startsWith(currentMonth));
-    
-    planData = categories.map(category => {
-      const categoryOps = monthlyOperations.filter(op => op.category_id === category.id);
-      const actual = categoryOps.reduce((sum, op) => sum + op.amount_cents, 0) / 100;
-      const planned = category.limit_value || 0;
-      const remaining = planned - actual;
-      const percentage = planned > 0 ? Math.min((actual / planned) * 100, 100) : 0;
-      
-      let status: 'ok' | 'warning' | 'danger' = 'ok';
-      if (percentage > 90) status = 'danger';
-      else if (percentage > 70) status = 'warning';
-      
-      return {
-        category,
-        planned,
-        actual,
-        remaining,
-        percentage,
-        status
-      };
-    }).filter(item => item.planned > 0); // Показываем только категории с планом
-  });
+  // Сумма, которую ожидаем по каждому источнику в этом месяце (симулятор)
+  // Храним в meta: sim_amount_<source_id> = строка рублей (например "50000.00")
+  let sim: Record<string,string> = {};
 
-  function formatMoney(amount: number): string {
-    return new Intl.NumberFormat('ru-RU', {
-      style: 'currency',
-      currency: 'RUB',
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0
-    }).format(amount);
+  function centsFromStr(v: string): number {
+    const n = Number(String(v || '').replace(',', '.'));
+    return Number.isFinite(n) ? Math.round(n * 100) : 0;
   }
+  function rub(cents: number): string {
+    return (cents/100).toFixed(2);
+  }
+  function nowIso(){ return new Date().toISOString(); }
+  function uuid(){ return (browser && crypto?.randomUUID) ? crypto.randomUUID() : Math.random().toString(36).slice(2); }
 
-  function getStatusColor(status: string): string {
-    switch (status) {
-      case 'ok': return 'var(--ok)';
-      case 'warning': return 'var(--warning)';
-      case 'danger': return 'var(--danger)';
-      default: return 'var(--muted)';
+  async function loadAll() {
+    categories = (await db.categories.toArray()).filter(c => c.kind==='expense' && !c.deleted_at)
+      .sort((a,b)=>a.name.localeCompare(b.name));
+    sources = (await db.sources.toArray()).filter(s => !s.deleted_at)
+      .sort((a,b)=>a.name.localeCompare(b.name));
+    rules = (await db.rules.toArray()).filter(r => !r.deleted_at);
+
+    // загрузим симулятор
+    for (const s of sources) {
+      const k = 'sim_amount_' + s.id;
+      sim[s.id] = (await db.meta.get(k))?.value || '';
     }
   }
 
-  $: totalPlanned = planData.reduce((sum, item) => sum + item.planned, 0);
-  $: totalActual = planData.reduce((sum, item) => sum + item.actual, 0);
-  $: totalRemaining = totalPlanned - totalActual;
+  onMount(loadAll);
+
+  // Получить/создать правило для пары (category, source)
+  function getRule(catId: string, srcId: string): Rule {
+    let r = rules.find(r => r.category_id===catId && r.source_id===srcId && !r.deleted_at);
+    if (!r) {
+      const t = nowIso();
+      r = { id: uuid(), user_id:'local', source_id:srcId, category_id:catId, percent:0, fixed_cents:null, cap_cents:null, created_at:t, updated_at:t, deleted_at:null };
+      rules.push(r);
+      // не записываем в БД до первого ввода, чтобы не плодить пустые строки
+    }
+    return r;
+  }
+
+  async function saveRule(r: Rule) {
+    r.updated_at = nowIso();
+    await db.rules.put(r);
+  }
+
+  async function onPercentChange(catId: string, srcId: string, v: string) {
+    let r = getRule(catId, srcId);
+    const num = Number(v.replace(',', '.')); r.percent = Number.isFinite(num) ? num : 0;
+    await saveRule(r);
+  }
+  async function onFixedChange(catId: string, srcId: string, v: string) {
+    let r = getRule(catId, srcId);
+    const c = centsFromStr(v); r.fixed_cents = c || null;
+    await saveRule(r);
+  }
+  async function onSimChange(srcId: string, v: string) {
+    sim[srcId] = v;
+    await db.meta.put({ key: 'sim_amount_'+srcId, value: v });
+  }
+
+  // Подсчёт «Минусы ₽» по категории за текущий месяц
+  let monthKey = new Date().toISOString().slice(0,7); // YYYY-MM
+  let spentByCat: Record<string, number> = {};
+
+  async function calcSpent() {
+    spentByCat = {};
+    const ops = await db.operations.toArray();
+    for (const op of ops) {
+      if (op.deleted_at) continue;
+      if (op.type !== 'expense') continue;
+      if (!op.date?.startsWith(monthKey)) continue;
+      spentByCat[op.category_id] = (spentByCat[op.category_id] || 0) + (op.amount_cents || 0);
+    }
+  }
+  onMount(calcSpent);
+
+  function planFor(catId: string, srcId: string): number {
+    const r = rules.find(r => r.category_id===catId && r.source_id===srcId && !r.deleted_at);
+    const income = centsFromStr(sim[srcId] || '0'); // сумма для источника
+    if (!r) return 0;
+    const byPercent = Math.round(income * (r.percent || 0) / 100);
+    const byFixed = r.fixed_cents || 0;
+    let total = byPercent + byFixed;
+    if (r.cap_cents != null) total = Math.min(total, r.cap_cents);
+    return total;
+  }
+
+  function remainder(catId: string): number {
+    const planned = sources.reduce((sum,s)=> sum + planFor(catId, s.id), 0);
+    const spent = spentByCat[catId] || 0;
+    return planned - spent;
+  }
 </script>
 
-<style>
-  .plan-table {
-    width: 100%;
-    border-collapse: collapse;
-    margin-top: 16px;
-  }
-  .plan-table th {
-    text-align: left;
-    padding: 12px 8px;
-    color: var(--muted);
-    font-size: 12px;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-    border-bottom: 1px solid rgba(255,255,255,0.06);
-  }
-  .plan-table td {
-    padding: 12px 8px;
-    border-bottom: 1px solid rgba(255,255,255,0.03);
-  }
-  .category-name {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    font-weight: 500;
-  }
-  .category-icon {
-    width: 20px;
-    height: 20px;
-    border-radius: 6px;
-    display: grid;
-    place-items: center;
-    font-size: 12px;
-  }
-  .progress-bar {
-    width: 100%;
-    height: 6px;
-    background: rgba(255,255,255,0.1);
-    border-radius: 3px;
-    overflow: hidden;
-  }
-  .progress-fill {
-    height: 100%;
-    border-radius: 3px;
-    transition: width 0.3s ease;
-  }
-  .amount {
-    font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, monospace;
-    font-size: 14px;
-  }
-  .summary-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-    gap: 16px;
-    margin-bottom: 24px;
-  }
-  .summary-card {
-    background: var(--card);
-    border-radius: var(--radius);
-    padding: 16px;
-    border: 1px solid rgba(255,255,255,.06);
-    text-align: center;
-  }
-  .summary-value {
-    font-size: 24px;
-    font-weight: 700;
-    margin: 8px 0;
-    font-family: 'SF Mono', Monaco, monospace;
-  }
-  .summary-label {
-    color: var(--muted);
-    font-size: 12px;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-  }
-</style>
-
 <section>
-  <h1 class="h1">План бюджета</h1>
-  <p class="sub">Контроль расходов по категориям за текущий месяц</p>
+  <h1 class="h1">План месяца</h1>
+  <p class="sub">Задайте проценты или фикс для каждой пары «Категория × Источник». Вверху введите суммы ожидаемых доходов.</p>
 
-  <!-- Сводка -->
-  <div class="summary-grid">
-    <div class="summary-card">
-      <div class="summary-label">Запланировано</div>
-      <div class="summary-value" style="color: var(--text)">{formatMoney(totalPlanned)}</div>
-    </div>
-    <div class="summary-card">
-      <div class="summary-label">Потрачено</div>
-      <div class="summary-value" style="color: var(--warning)">{formatMoney(totalActual)}</div>
-    </div>
-    <div class="summary-card">
-      <div class="summary-label">Остается</div>
-      <div class="summary-value" style="color: {totalRemaining >= 0 ? 'var(--ok)' : 'var(--danger)'}">
-        {formatMoney(totalRemaining)}
-      </div>
+  <!-- Симулятор доходов -->
+  <div class="card">
+    <div class="h2">Ожидаемые суммы по источникам</div>
+    <div class="row">
+      {#each sources as s}
+        <div>
+          <label class="label" for="sim-{s.id}">{s.name} ({s.currency || 'RUB'})</label>
+          <input id="sim-{s.id}" class="input" inputmode="decimal" placeholder="0.00" bind:value={sim[s.id]}
+                 on:change={(e)=> onSimChange(s.id, (e.target as HTMLInputElement).value)} />
+        </div>
+      {/each}
     </div>
   </div>
 
-  <!-- Таблица планов -->
-  <div class="card">
-    <div class="h2">План по категориям</div>
-    
-    {#if planData.length === 0}
-      <p class="sub">
-        Нет категорий с установленными лимитами. 
-        <a href="/settings">Настройте лимиты</a> для отслеживания бюджета.
-      </p>
-    {:else}
-      <table class="plan-table">
-        <thead>
-          <tr>
-            <th>Категория</th>
-            <th>План</th>
-            <th>Факт</th>
-            <th>Остаток</th>
-            <th>Прогресс</th>
+  <div style="height:12px"></div>
+
+  <!-- Таблица плана -->
+  <div class="card" style="overflow:auto">
+    <table style="width:100%; border-collapse:collapse; min-width:780px">
+      <thead style="text-align:left; color:var(--muted); font-size:12px">
+        <tr>
+          <th style="padding:8px">Категория</th>
+          <th style="padding:8px">Источник</th>
+          <th style="padding:8px; width:110px">Ввод %</th>
+          <th style="padding:8px; width:140px">Ввод ₽</th>
+          <th style="padding:8px; width:120px">План ₽</th>
+          <th style="padding:8px; width:120px">Минусы ₽</th>
+          <th style="padding:8px; width:120px">Остаток ₽</th>
+        </tr>
+      </thead>
+      <tbody>
+        {#each categories as c}
+          {#each sources as s}
+          <tr style="border-top:1px solid rgba(255,255,255,.06)">
+            <td style="padding:8px">{c.name}</td>
+            <td style="padding:8px">{s.name}</td>
+            <td style="padding:8px">
+              {#key c.id + ':' + s.id}
+                <input class="input" style="padding:10px; font-size:16px" inputmode="decimal"
+                  value={(rules.find(r=>r.category_id===c.id && r.source_id===s.id)?.percent ?? 0).toString()}
+                  on:change={(e)=> onPercentChange(c.id, s.id, (e.target as HTMLInputElement).value)} />
+              {/key}
+            </td>
+            <td style="padding:8px">
+              {#key 'f'+c.id + ':' + s.id}
+                <input class="input" style="padding:10px; font-size:16px" inputmode="decimal"
+                  value={(() => {
+                    const r = rules.find(r=>r.category_id===c.id && r.source_id===s.id);
+                    return r?.fixed_cents ? (r.fixed_cents/100).toFixed(2) : '';
+                  })()}
+                  placeholder="0.00"
+                  on:change={(e)=> onFixedChange(c.id, s.id, (e.target as HTMLInputElement).value)} />
+              {/key}
+            </td>
+            <td style="padding:8px; font-variant-numeric: tabular-nums">{rub(planFor(c.id, s.id))}</td>
+            {#if s === sources[0]}
+              <!-- объединяем ячейки «Минусы» и «Остаток» по категории -->
+              <td style="padding:8px; font-variant-numeric: tabular-nums" rowspan={sources.length}>
+                {rub(spentByCat[c.id] || 0)}
+              </td>
+              <td style="padding:8px; font-variant-numeric: tabular-nums" rowspan={sources.length}>
+                {rub(remainder(c.id))}
+              </td>
+            {/if}
           </tr>
-        </thead>
-        <tbody>
-          {#each planData as item}
-            <tr>
-              <td>
-                <div class="category-name">
-                  <div 
-                    class="category-icon" 
-                    style="background-color: {item.category.color}; color: {item.category.color}22"
-                  >
-                    {item.category.icon || '💰'}
-                  </div>
-                  {item.category.name}
-                </div>
-              </td>
-              <td>
-                <div class="amount">{formatMoney(item.planned)}</div>
-              </td>
-              <td>
-                <div class="amount" style="color: var(--warning)">{formatMoney(item.actual)}</div>
-              </td>
-              <td>
-                <div 
-                  class="amount" 
-                  style="color: {item.remaining >= 0 ? 'var(--ok)' : 'var(--danger)'}"
-                >
-                  {formatMoney(item.remaining)}
-                </div>
-              </td>
-              <td style="width: 120px;">
-                <div class="progress-bar">
-                  <div 
-                    class="progress-fill" 
-                    style="width: {item.percentage}%; background-color: {getStatusColor(item.status)}"
-                  ></div>
-                </div>
-                <div style="font-size: 11px; color: var(--muted); margin-top: 4px;">
-                  {Math.round(item.percentage)}%
-                </div>
-              </td>
-            </tr>
           {/each}
-        </tbody>
-      </table>
-    {/if}
-    
-    <div style="margin-top: 16px; padding-top: 16px; border-top: 1px solid rgba(255,255,255,0.06);">
-      <div class="row">
-        <a class="btn secondary" href="/add">Добавить операцию</a>
-        <a class="btn secondary" href="/settings">Настроить лимиты</a>
-      </div>
-    </div>
+        {/each}
+      </tbody>
+    </table>
   </div>
 </section>
