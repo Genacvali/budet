@@ -1,0 +1,61 @@
+[Unit]
+Description=Budget PWA FastAPI Backend
+Documentation=https://github.com/budget-pwa/backend
+After=network.target network-online.target
+Wants=network-online.target
+Requires=network.target
+
+[Service]
+Type=exec
+User=budget-pwa
+Group=budget-pwa
+WorkingDirectory=/opt/budget-pwa/backend
+
+# Environment
+Environment=PATH=/opt/budget-pwa/backend/venv/bin
+Environment=PYTHONPATH=/opt/budget-pwa/backend
+EnvironmentFile=-/opt/budget-pwa/backend/.env
+
+# Execution
+ExecStartPre=/opt/budget-pwa/backend/venv/bin/python -c "from app.db import init_db; import asyncio; asyncio.run(init_db())"
+ExecStart=/opt/budget-pwa/backend/venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 1
+ExecReload=/bin/kill -HUP $MAINPID
+
+# Process management
+KillMode=mixed
+KillSignal=SIGTERM
+TimeoutStopSec=30
+Restart=always
+RestartSec=3
+
+# Output and logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=budget-api
+
+# Security settings
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictRealtime=true
+RestrictNamespaces=true
+LockPersonality=true
+MemoryDenyWriteExecute=true
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+
+# File system access
+ReadWritePaths=/opt/budget-pwa/backend
+ReadWritePaths=/var/log/budget-pwa
+ReadOnlyPaths=/etc/ssl/certs
+ReadOnlyPaths=/etc/resolv.conf
+
+# Limits
+LimitNOFILE=4096
+LimitNPROC=512
+
+[Install]
+WantedBy=multi-user.target
