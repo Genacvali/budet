@@ -164,8 +164,8 @@
     <!-- Источник дохода -->
     {#if type === 'income' && sources.length > 0}
       <div style="margin-bottom: 20px;">
-        <label class="label">Источник дохода</label>
-        <select bind:value={source_id} class="input select">
+        <label class="label" for="source-select">Источник дохода</label>
+        <select id="source-select" bind:value={source_id} class="input select">
           <option value={null}>Выберите источник...</option>
           {#each sources as source}
             <option value={source.id}>{source.name}</option>
@@ -176,8 +176,8 @@
 
     <!-- Категория -->
     <div style="margin-bottom: 20px;">
-      <label class="label">Категория</label>
-      <select bind:value={category_id} required class="input select">
+      <label class="label" for="category-select">Категория</label>
+      <select id="category-select" bind:value={category_id} required class="input select">
         <option value="">Выберите категорию...</option>
         {#each filteredCategories as category}
           <option value={category.id}>
@@ -189,8 +189,9 @@
 
     <!-- Сумма -->
     <div style="margin-bottom: 20px;">
-      <label class="label">Сумма (₽)</label>
+      <label class="label" for="amount-input">Сумма (₽)</label>
       <input 
+        id="amount-input"
         type="text"
         inputmode="decimal"
         bind:value={amount}
@@ -215,8 +216,9 @@
 
     <!-- Заметка -->
     <div style="margin-bottom: 24px;">
-      <label class="label">Заметка (необязательно)</label>
+      <label class="label" for="note-input">Заметка (необязательно)</label>
       <input 
+        id="note-input"
         type="text"
         bind:value={note}
         placeholder="Описание операции..."

@@ -13,7 +13,7 @@
 <section style="font-family:system-ui; padding:16px; max-width:480px; margin:auto">
   <h2>Регистрация</h2>
   {#if error}<div style="color:#b91c1c">{error}</div>{/if}
-  <label>Email<br/><input bind:value={email} type="email" required /></label><br/><br/>
-  <label>Пароль<br/><input bind:value={password} type="password" minlength="6" required /></label><br/><br/>
+  <label for="register-email">Email<br/><input id="register-email" bind:value={email} type="email" required /></label><br/><br/>
+  <label for="register-password">Пароль<br/><input id="register-password" bind:value={password} type="password" minlength="6" required /></label><br/><br/>
   <button on:click|preventDefault={onSubmit}>Создать</button>
 </section>
