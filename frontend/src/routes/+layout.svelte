@@ -5,22 +5,40 @@
   import '$lib/styles.css';
 
   let fatalError: string | null = null;
-  let syncInterval: ReturnType<typeof setInterval>;
+  let syncInterval: number | undefined;
   let drawer = false;
 
   if (browser) {
-    window.addEventListener('error', (e) => { fatalError = String((e as any).error?.message || e.message); });
-    window.addEventListener('unhandledrejection', (e) => { fatalError = String((e as any).reason?.message || (e as any).reason); });
+    window.addEventListener('error', (e: ErrorEvent) => { 
+      fatalError = String(e.error?.message || e.message); 
+    });
+    window.addEventListener('unhandledrejection', (e: PromiseRejectionEvent) => { 
+      fatalError = String(e.reason?.message || e.reason); 
+    });
   }
 
   onMount(() => {
     // работаем локально: синк включится, если появится токен (но мы его не используем)
     pull();
-    syncInterval = setInterval(() => { push(); pull(); }, 5 * 60 * 1000);
-    return () => clearInterval(syncInterval);
+    syncInterval = setInterval(() => { 
+      push(); 
+      pull(); 
+    }, 5 * 60 * 1000) as unknown as number;
+    
+    return () => {
+      if (syncInterval) {
+        clearInterval(syncInterval);
+      }
+    };
   });
 
-  const links = [
+  interface NavLink {
+    href: string;
+    label: string;
+    icon: string;
+  }
+
+  const links: NavLink[] = [
     { href: '/',        label: 'Домой',        icon: 'M10 2l6 6v8a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V8l6-6z' },
     { href: '/minus',   label: 'Минус',        icon: 'M4 10h12' },
     { href: '/plan',    label: 'План',         icon: 'M3 14h14M3 10h14M3 6h14' },

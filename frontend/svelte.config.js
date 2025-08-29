@@ -3,7 +3,13 @@ import sveltePreprocess from 'svelte-preprocess';
 
 export default {
   preprocess: sveltePreprocess({
-    postcss: true
+    postcss: true,
+    typescript: {
+      tsconfigFile: './tsconfig.json',
+      compilerOptions: {
+        verbatimModuleSyntax: true
+      }
+    }
   }),
   kit: {
     adapter: adapter({
