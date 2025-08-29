@@ -11,6 +11,13 @@ echo "🔄 Updating Budget PWA on server..."
 # Сборка только фронтенда (обычно меняется чаще)
 echo "📦 Building frontend..."
 cd frontend
+
+# Проверяем наличие node_modules
+if [ ! -d "node_modules" ]; then
+  echo "📥 Installing dependencies..."
+  npm install --legacy-peer-deps
+fi
+
 npm run build
 cd ..
 

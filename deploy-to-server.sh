@@ -14,7 +14,15 @@ echo "Remote path: $REMOTE_DIR"
 # Сборка фронтенда
 echo "📦 Building frontend..."
 cd frontend
-npm install
+
+# Очистка старых зависимостей
+rm -rf node_modules package-lock.json 2>/dev/null || true
+
+# Установка зависимостей с исправлением конфликтов
+echo "📥 Installing dependencies..."
+npm install --legacy-peer-deps
+
+echo "🔨 Building project..."
 npm run build
 cd ..
 
