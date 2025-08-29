@@ -1,14 +1,33 @@
 [Unit]
 Description=Budget PWA API (FastAPI/Uvicorn)
-After=network.target
+After=network.target nginx.service
+Wants=nginx.service
 
 [Service]
-WorkingDirectory=/data/budet/budget-pwa/backend
-Environment=DB_PATH=/data/budet/budget-pwa/backend/data/budget.db
-Environment=JWT_SECRET=CHANGE_ME_RANDOM_SECRET
-ExecStart=/data/budet/venv/bin/python -m uvicorn app.main:app --host 127.0.0.1 --port 8000 --workers 1
+Type=exec
+WorkingDirectory=/opt/budget-pwa/backend
+Environment=PATH=/opt/budget-pwa/backend/venv/bin
+Environment=DB_PATH=/opt/budget-pwa/backend/data/budget.db
+Environment=JWT_SECRET=CHANGE_ME_RANDOM_SECRET_$(date +%s)
+ExecStart=/opt/budget-pwa/backend/venv/bin/python -m uvicorn app.main:app --host 127.0.0.1 --port 8000 --workers 2
+ExecReload=/bin/kill -HUP $MAINPID
 Restart=on-failure
-User=root
+RestartSec=5
+User=budgetapp
+Group=budgetapp
+
+# Безопасность
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=yes
+ReadWritePaths=/opt/budget-pwa/backend/data
+RestrictSUIDSGID=yes
+
+# Логирование
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=budget-api
 
 [Install]
 WantedBy=multi-user.target
